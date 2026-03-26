@@ -10,19 +10,17 @@
 /* ───────────────────────── RESET & VARS ───────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0d0a07;
-  --surface:#181310;
-  --surface2:#221e19;
-  --gold:#c9a84c;
-  --gold-light:#e8c96e;
-  --red:#c0392b;
-  --cream:#f5ede0;
-  --cream2:#ede0cc;
-  --text:#f0e8dc;
-  --text-muted:#9a8a78;
-  --border:#2e2720;
-  --success:#2ecc71;
-  --r:12px;
+  :root {
+  --bg: #0f0c09;        /* Einen Tick heller als tiefschwarz */
+  --surface: #1c1712;   /* Deutlichere Abhebung für Karten */
+  --surface2: #2a241e;  /* Für Inputs und Hover-Effekte */
+  --gold: #d4af37;      /* Kräftigeres Gold für bessere Sichtbarkeit */
+  --gold-light: #f1d592;
+  --text: #ffffff;      /* Maximale Lesbarkeit */
+  --text-muted: #b5a48b; /* Helleres Grau-Braun */
+  --border: #3d342a;    /* Sichtbarere Trennlinien */
+  --success: #27ae60;
+  --r: 12px;
 }
 html{scroll-behavior:smooth}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;line-height:1.6}
