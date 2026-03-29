@@ -1558,27 +1558,101 @@ function pickPlan(el){
 }
 
 /* ─── LOGIN HANDLER ─── */
-function doLogin(){
-  const e=(document.getElementById('li-email').value||'').trim().toLowerCase();
-  const p=document.getElementById('li-pwd').value;
-  if(!e||!p){toast('Please fill in all fields','err');return}
-  if(e.includes('manager')||e.includes('admin')){
-    go('manager'); initManager(); toast('Welcome, Manager 🛡️','ok'); return;
+async function doLogin(){
+  const email = document.getElementById('li-email').value;
+  const password = document.getElementById('li-pwd').value;
+
+  if(!email || !password){
+    toast('Fill all fields','err');
+    return;
   }
-  if(e.includes('restaurant')){
-    go('restaurant'); initRestaurant(); toast('Welcome back! 👋','ok'); return;
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if(error){
+    toast(error.message,'err');
+    return;
   }
-  // default = customer
-  go('customer'); initCustomer(); toast('Welcome back, Karim! 👋','ok');
+
+  // Profil holen
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', data.user.id)
+    .single();
+
+  if(profileError){
+    toast('Error loading profile','err');
+    return;
+  }
+
+  // ROLE entscheidet wohin
+  if(profile.role === 'manager'){
+    go('manager');
+    initManager();
+  } else if(profile.role === 'restaurant'){
+    go('restaurant');
+    initRestaurant();
+  } else {
+    go('customer');
+    initCustomer();
+  }
+
+  toast('Welcome back!','ok');
 }
 
 /* ─── REGISTER HANDLER ─── */
-function doRegister(type){
-  toast('Account created! Welcome to TableDeal 🎉','ok');
-  setTimeout(()=>{
-    if(type==='restaurant'){go('restaurant');initRestaurant();}
-    else{go('customer');initCustomer();}
-  },700);
+async function doRegister(type){
+  const email = document.getElementById('reg-email').value;
+  const password = document.getElementById('reg-pwd').value;
+  const name = document.getElementById('reg-name').value;
+
+  if(!email || !password || !name){
+    toast('Fill all fields','err');
+    return;
+  }
+
+  // 1. User erstellen
+  const { data, error } = await supabase.auth.signUp({
+    email: email,
+    password: password
+  });
+
+  if(error){
+    toast(error.message,'err');
+    return;
+  }
+
+  const user = data.user;
+
+  // 2. Profil speichern
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .insert([{
+      id: user.id,
+      email: email,
+      name: name,
+      role: type // 'customer' oder 'restaurant'
+    }]);
+
+  if(profileError){
+    toast(profileError.message,'err');
+    return;
+  }
+
+  toast('Account created!','ok');
+
+  // Weiterleitung
+  if(type === 'restaurant'){
+    go('restaurant');
+    initRestaurant();
+  } else {
+    go('customer');
+    initCustomer();
+  }
 }
 
 /* ─── RESTAURANT PANE SWITCHER ─── */
