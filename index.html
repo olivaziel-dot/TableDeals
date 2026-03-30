@@ -1505,20 +1505,27 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
 <!-- ══════════════════════════════════════════════
    JAVASCRIPT
 ══════════════════════════════════════════════ -->
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+<script>
 'use strict';
+
 const SUPABASE_URL = "https://zobuswshitvhyebkqzya.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VSli61KD563Oa0aSAaKYTg_PgrRBX94";
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/* WICHTIG:
+   Nicht "const supabase = ..."
+   weil das mit dem globalen CDN-Objekt kollidiert.
+*/
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ─── PAGE ROUTER ─── */
 function go(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
+  const page = document.getElementById('page-'+name);
+  if(page) page.classList.add('active');
   window.scrollTo(0,0);
-  // show main nav only on landing
-  document.getElementById('main-nav').style.display = name==='landing' ? 'flex' : 'none';
+
+  const nav = document.getElementById('main-nav');
+  if(nav) nav.style.display = name==='landing' ? 'flex' : 'none';
 }
 
 function scrollSection(id){
@@ -1528,7 +1535,8 @@ function scrollSection(id){
 
 /* ─── NAV SCROLL EFFECT ─── */
 window.addEventListener('scroll',()=>{
-  document.getElementById('main-nav').classList.toggle('scrolled',scrollY>40);
+  const nav = document.getElementById('main-nav');
+  if(nav) nav.classList.toggle('scrolled',scrollY>40);
 });
 
 /* ─── TICKER DUPLICATE ─── */
@@ -1542,14 +1550,14 @@ function fillLogin(e,p){
   document.getElementById('li-email').value=e;
   document.getElementById('li-pwd').value=p;
 }
+
 /* ─── HELPER ─── */
 function eyeToggle(id,btn){
   const i=document.getElementById(id);
+  if(!i) return;
   i.type=i.type==='password'?'text':'password';
   btn.textContent=i.type==='password'?'👁':'🙈';
 }
-
-// HIER STAND DAS BÖSE GO() -> GELÖSCHT
 
 function regTab(type){
   document.getElementById('reg-c').style.display=type==='customer'?'block':'none';
@@ -1559,30 +1567,30 @@ function regTab(type){
 }
 
 function pickPlan(el){
-  el.closest('.plan-picker').querySelectorAll('.plan-opt').forEach(p=>p.classList.remove('sel'));
+  const picker = el.closest('.plan-picker');
+  if(!picker) return;
+  picker.querySelectorAll('.plan-opt').forEach(p=>p.classList.remove('sel'));
   el.classList.add('sel');
 }
 
-// HIER STAND NOCHMAL DAS BÖSE GO() -> GELÖSCHT
-
 /* ─── LOGIN HANDLER ─── */
 async function doLogin(){
-  const email = document.getElementById('li-email').value;
-  const password = document.getElementById('li-pwd').value;
+  const email = document.getElementById('li-email').value.trim();
+  const password = document.getElementById('li-pwd').value.trim();
 
   if(!email || !password){
     toast('Fill all fields','err');
     return;
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
   if(error){
     toast(error.message,'err');
     return;
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabaseClient
     .from('profiles')
     .select('*')
     .eq('id', data.user.id)
@@ -1593,7 +1601,6 @@ async function doLogin(){
     return;
   }
 
-  // Das hier nutzt jetzt wieder dein ECHTES go('manager') etc.
   if(profile.role === 'manager'){
     go('manager');
     initManager();
@@ -1610,17 +1617,31 @@ async function doLogin(){
 
 /* ─── REGISTER HANDLER ─── */
 async function doRegister(type){
-  const email = document.getElementById('reg-email').value;
-  const password = document.getElementById('reg-pwd').value;
-  const name = document.getElementById('reg-name').value;
+  let email = '';
+  let password = '';
+  let name = '';
+
+  if(type === 'customer'){
+    const firstName = document.querySelector('#reg-c input[placeholder="Karim"]')?.value?.trim() || '';
+    const lastName = document.querySelector('#reg-c input[placeholder="Hassan"]')?.value?.trim() || '';
+    email = document.querySelector('#reg-c input[type="email"]')?.value?.trim() || '';
+    password = document.getElementById('rp-c')?.value?.trim() || '';
+    name = `${firstName} ${lastName}`.trim();
+  } else {
+    const firstName = document.querySelector('#reg-r input[placeholder="Nour"]')?.value?.trim() || '';
+    const lastName = document.querySelector('#reg-r input[placeholder="Salameh"]')?.value?.trim() || '';
+    email = document.querySelector('#reg-r input[type="email"]')?.value?.trim() || '';
+    password = document.getElementById('rp-r')?.value?.trim() || '';
+    const restaurantName = document.querySelector('#reg-r input[placeholder="e.g. Burgerlicious Beirut"]')?.value?.trim() || '';
+    name = restaurantName || `${firstName} ${lastName}`.trim();
+  }
 
   if(!email || !password || !name){
     toast('Fill all fields','err');
     return;
   }
 
-  // 1. User erstellen
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await supabaseClient.auth.signUp({
     email: email,
     password: password
   });
@@ -1631,15 +1652,18 @@ async function doRegister(type){
   }
 
   const user = data.user;
+  if(!user){
+    toast('User could not be created','err');
+    return;
+  }
 
-  // 2. Profil speichern
-  const { error: profileError } = await supabase
+  const { error: profileError } = await supabaseClient
     .from('profiles')
     .insert([{
       id: user.id,
       email: email,
       name: name,
-      role: type // 'customer' oder 'restaurant'
+      role: type
     }]);
 
   if(profileError){
@@ -1649,7 +1673,6 @@ async function doRegister(type){
 
   toast('Account created!','ok');
 
-  // Weiterleitung
   if(type === 'restaurant'){
     go('restaurant');
     initRestaurant();
@@ -1776,12 +1799,10 @@ function renderDeals(){
 /* ─── DEAL MODAL + ANTI-CHEAT COUPON ─── */
 let _modalDeal=null;
 let _timerInterval=null;
-const USER_ID='USR-K38'; // simulated logged-in user ID
+const USER_ID='USR-K38';
 
-// Generates a time-based code that changes every 5 minutes
-// Encodes: dealKey + userID + time block → makes sharing screenshots useless
 function liveCode(dealKey){
-  const block=Math.floor(Date.now()/(5*60*1000)); // new block every 5 min
+  const block=Math.floor(Date.now()/(5*60*1000));
   const seed=`${dealKey}|${USER_ID}|${block}`;
   let h=5381;
   for(let i=0;i<seed.length;i++){h=((h<<5)+h)^seed.charCodeAt(i);h>>>=0}
@@ -1856,10 +1877,9 @@ function verifyCode(){
     res.textContent='❌ No deal found for this code.';
     return;
   }
-  // Check current block
   const block=Math.floor(Date.now()/(5*60*1000));
   let matched=false;
-  for(let offset=0;offset<=0;offset++){// only current block valid (offset=1 = previous 5 min = expired)
+  for(let offset=0;offset<=0;offset++){
     const seed=`${dealKey}|${USER_ID}|${block-offset}`;
     let h=5381;for(let i=0;i<seed.length;i++){h=((h<<5)+h)^seed.charCodeAt(i);h>>>=0}
     const expected='TD-'+dealKey+'-'+h.toString(36).toUpperCase().padEnd(6,'0').slice(0,6);
