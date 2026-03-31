@@ -877,15 +877,56 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
         <!-- CUSTOMER FORM -->
         <div id="reg-c">
           <div class="two-col">
-            <div class="form-group"><label>First Name</label><input class="input-field" placeholder="Karim"/></div>
-            <div class="form-group"><label>Last Name</label><input class="input-field" placeholder="Hassan"/></div>
+            <div class="form-group"><label>First Name</label><input class="input-field" placeholder="Samir"/></div>
+            <div class="form-group"><label>Last Name</label><input class="input-field" placeholder="Ghossen"/></div>
           </div>
           <div class="form-group"><label>Email</label><input class="input-field" type="email" placeholder="you@example.com"/></div>
           <div class="form-group"><label>Phone Number</label><input class="input-field" type="tel" placeholder="+961 3 123 456"/></div>
           <div class="form-group"><label>Your District</label>
             <select class="input-field">
-              <option>Beirut – Gemmayzeh</option><option>Beirut – Mar Mikhael</option><option>Beirut – Achrafieh</option><option>Beirut – Downtown</option><option>Jounieh</option><option>Dbayeh</option><option>Jbeil (Byblos)</option><option>Tripoli</option><option>Sidon</option><option>Other</option>
-            </select>
+  <option>Beirut – Achrafieh</option>
+  <option>Beirut – Ain El Mreisseh</option>
+  <option>Beirut – Badaro</option>
+  <option>Beirut – Basta</option>
+  <option>Beirut – Downtown</option>
+  <option>Beirut – Gemmayzeh</option>
+  <option>Beirut – Hamra</option>
+  <option>Beirut – Mar Mikhael</option>
+  <option>Beirut – Mazraa</option>
+  <option>Beirut – Monot</option>
+  <option>Beirut – Mousaitbeh</option>
+  <option>Beirut – Ras Beirut</option>
+  <option>Beirut – Verdun</option>
+  <option>Baabda</option>
+  <option>Bchamoun</option>
+  <option>Bhamdoun</option>
+  <option>Dbayeh</option>
+  <option>Hazmieh</option>
+  <option>Jal El Dib</option>
+  <option>Jdeideh</option>
+  <option>Jounieh</option>
+  <option>Kaslik</option>
+  <option>Khaldeh</option>
+  <option>Mansourieh</option>
+  <option>Metn</option>
+  <option>Sin El Fil</option>
+  <option>Zahle</option>
+  <option>Aley</option>
+  <option>Batroun</option>
+  <option>Bint Jbeil</option>
+  <option>Bsharri</option>
+  <option>Byblos (Jbeil)</option>
+  <option>Chouf</option>
+  <option>Ehden</option>
+  <option>Jezzine</option>
+  <option>Koura</option>
+  <option>Nabatieh</option>
+  <option>Saida (Sidon)</option>
+  <option>Sour (Tyre)</option>
+  <option>Tripoli</option>
+  <option>Zgharta</option>
+  <option>Other</option>
+</select>
           </div>
           <div class="form-group"><label>Password</label>
             <div class="pwd-wrap"><input class="input-field" type="password" id="rp-c" placeholder="Min. 8 characters"/><button class="pwd-eye" onclick="eyeToggle('rp-c',this)">👁</button></div>
@@ -940,11 +981,11 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
     <div class="nav-logo" style="font-size:1.35rem">Table<span>Deal</span></div>
     <div style="display:flex;align-items:center;gap:12px">
       <div class="user-pill">
-        <div class="u-avatar">K</div>
-        <span class="u-name">Karim</span>
-        <span class="tag">Gourmet</span>
-        <button class="u-logout" onclick="go('landing')">↩ Logout</button>
-      </div>
+  <div class="u-avatar" id="user-avatar">U</div>
+  <span class="u-name" id="user-name">User</span>
+  <span class="tag" id="user-plan">Member</span>
+  <button class="u-logout" onclick="go('landing')">↩ Logout</button>
+</div>
     </div>
   </nav>
   <!-- Search -->
@@ -1770,7 +1811,44 @@ function addTC(){
 
 /* ─── CUSTOMER INIT ─── */
 let activeFilter='all';
-function initCustomer(){renderDeals()}
+function initCustomer(){
+  loadCurrentUserProfile();
+  renderDeals();
+}
+   async function loadCurrentUserProfile(){
+  const { data: authData, error: authError } = await supabaseClient.auth.getUser();
+
+  if(authError || !authData?.user) {
+    console.error('No logged in user found', authError);
+    return;
+  }
+
+  const userId = authData.user.id;
+
+  const { data: profile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if(profileError){
+    console.error('Error loading profile:', profileError);
+    return;
+  }
+
+  const fullName = profile.name || 'User';
+  const firstLetter = fullName.trim().charAt(0).toUpperCase() || 'U';
+
+  const userNameEl = document.getElementById('user-name');
+  const userAvatarEl = document.getElementById('user-avatar');
+  const userPlanEl = document.getElementById('user-plan');
+
+  if(userNameEl) userNameEl.textContent = fullName;
+  if(userAvatarEl) userAvatarEl.textContent = firstLetter;
+
+  // solange wir noch keinen echten Plan speichern:
+  if(userPlanEl) userPlanEl.textContent = 'Member';
+}
 function setFilter(el,f){
   document.querySelectorAll('.f-chip').forEach(c=>c.classList.remove('on'));
   el.classList.add('on');activeFilter=f;renderDeals();
@@ -2144,8 +2222,8 @@ window.addEventListener('DOMContentLoaded',()=>{buildHours();});
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r3);padding:36px">
         <h2 style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:700;margin-bottom:20px;color:var(--text)">Send Us a Message</h2>
         <div class="two-col">
-          <div class="form-group"><label>First Name</label><input class="input-field" placeholder="Karim"/></div>
-          <div class="form-group"><label>Last Name</label><input class="input-field" placeholder="Hassan"/></div>
+          <div class="form-group"><label>First Name</label><input class="input-field" placeholder="Samir"/></div>
+          <div class="form-group"><label>Last Name</label><input class="input-field" placeholder="Ghossen"/></div>
         </div>
         <div class="form-group"><label>Email Address</label><input class="input-field" type="email" id="contact-email" placeholder="you@example.com"/></div>
         <div class="form-group"><label>Phone (optional)</label><input class="input-field" type="tel" placeholder="+961 3 123 456"/></div>
