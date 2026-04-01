@@ -2084,7 +2084,7 @@ function renderDeals(){
     return;
   }
   grid.innerHTML=list.map(d=>`
-    <div class="deal-card" onclick="openDeal(${d.id})">
+    <div class="deal-card" onclick="openDeal('${d.id}')">
       <div class="deal-img">
         <img src="${d.img}" alt="" loading="lazy"/>
         <div class="deal-disc">${d.disc}</div>
@@ -2158,6 +2158,7 @@ function liveCode(dealKey){
 
     return {
       id: o.id,
+      restaurant_id: o.restaurant_id,
       title: o.title || 'Untitled Offer',
       restaurant: restaurant.name || 'Restaurant',
       district: restaurant.location || 'Lebanon',
@@ -2168,8 +2169,14 @@ function liveCode(dealKey){
       orig: o.original_price || '-',
       price: o.discount_value || '-',
       desc: o.short_desc || o.full_desc || 'Special offer for TableDeal members.',
-      tc: ['Valid for a limited time', 'Subject to restaurant terms'],
-      dealKey: String(o.id).slice(0, 6).toUpperCase()
+      full_desc: o.full_desc || o.short_desc || 'Special offer for TableDeal members.',
+      tc: [],
+      dealKey: String(o.id).slice(0, 6).toUpperCase(),
+      valid_from: o.valid_from,
+      valid_until: o.valid_until,
+      start_time: o.start_time,
+      end_time: o.end_time,
+      discount_type: o.discount_type
     };
   });
 
@@ -2196,18 +2203,37 @@ function startCouponTimer(dealKey){
   _timerInterval=setInterval(tick,1000);
 }
 
-function openDeal(id){
-  const d=DEALS.find(x=>x.id===id);if(!d)return;
-  _modalDeal=d;
-  document.getElementById('m-img').src=d.img;
-  document.getElementById('m-rest').textContent=d.restaurant+' · '+d.district;
-  document.getElementById('m-title').textContent=d.title;
-  document.getElementById('m-desc').textContent=d.desc;
-  document.getElementById('m-orig').textContent=d.orig;
-  document.getElementById('m-price').textContent=d.price;
-  document.getElementById('m-tc').innerHTML=d.tc.map(t=>`<li>${t}</li>`).join('');
+async function openDeal(id){
+  const d = DEALS.find(x => String(x.id) === String(id));
+  if(!d) return;
+
+  const { data: terms, error: termsError } = await supabaseClient
+    .from('offer_terms')
+    .select('*')
+    .eq('offer_id', d.id)
+    .order('sort_order', { ascending: true });
+
+  if(termsError){
+    console.error('Error loading offer terms:', termsError);
+  }
+
+  const termList = (terms || []).map(t => t.term_text);
+
+  _modalDeal = d;
+
+  document.getElementById('m-img').src = d.img;
+  document.getElementById('m-rest').textContent = `${d.restaurant} · ${d.district}`;
+  document.getElementById('m-title').textContent = d.title;
+  document.getElementById('m-desc').textContent = d.full_desc || d.desc || '';
+  document.getElementById('m-orig').textContent = d.orig || '-';
+  document.getElementById('m-price').textContent = d.price || '-';
+
+  document.getElementById('m-tc').innerHTML = (
+    termList.length ? termList : ['Valid for a limited time']
+  ).map(t => `<li>${t}</li>`).join('');
+
   document.getElementById('deal-overlay').classList.add('open');
-  document.body.style.overflow='hidden';
+  document.body.style.overflow = 'hidden';
   startCouponTimer(d.dealKey);
 }
    async function loadCurrentRestaurant(){
