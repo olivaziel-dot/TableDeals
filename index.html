@@ -1942,6 +1942,14 @@ async function initCustomer(){
   const selectedCategoryEl = document.querySelector('#offer-category-group .chip.on');
   const category = selectedCategoryEl?.dataset?.category || null;
 
+  const termInputs = [...document.querySelectorAll('#tc-list input')];
+  const terms = termInputs
+    .map((input, index) => ({
+      term_text: input.value.trim(),
+      sort_order: index
+    }))
+    .filter(term => term.term_text);
+
   if(!title){
     toast('Offer title is required', 'err');
     return;
@@ -1960,10 +1968,11 @@ async function initCustomer(){
     valid_until: validUntil,
     start_time: startTime,
     end_time: endTime,
-    status
+    status,
+    terms
   });
 
-  const { error } = await supabaseClient
+  const { data: insertedOffer, error: offerError } = await supabaseClient
     .from('offers')
     .insert([{
       restaurant_id: restaurantId,
@@ -1979,13 +1988,34 @@ async function initCustomer(){
       start_time: startTime,
       end_time: endTime,
       status
-    }]);
+    }])
+    .select()
+    .single();
 
-  if(error){
-    console.error('Offer save error FULL:', JSON.stringify(error, null, 2));
-    console.error('Offer save error RAW:', error);
-    toast(error.message || 'Could not save offer', 'err');
+  if(offerError){
+    console.error('Offer save error FULL:', JSON.stringify(offerError, null, 2));
+    console.error('Offer save error RAW:', offerError);
+    toast(offerError.message || 'Could not save offer', 'err');
     return;
+  }
+
+  if(insertedOffer?.id && terms.length){
+    const termPayload = terms.map(term => ({
+      offer_id: insertedOffer.id,
+      term_text: term.term_text,
+      sort_order: term.sort_order
+    }));
+
+    const { error: termsError } = await supabaseClient
+      .from('offer_terms')
+      .insert(termPayload);
+
+    if(termsError){
+      console.error('Offer terms save error FULL:', JSON.stringify(termsError, null, 2));
+      console.error('Offer terms save error RAW:', termsError);
+      toast(termsError.message || 'Offer saved, but terms could not be saved', 'err');
+      return;
+    }
   }
 
   toast(status === 'active' ? 'Offer published! 🎉' : 'Saved as draft!', 'ok');
