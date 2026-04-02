@@ -1038,6 +1038,10 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
 </div>
    <div class="deals-wrap" style="padding-top:0">
   <div class="deals-heading">📅 My Reservations</div>
+      <div class="deals-wrap" style="padding-top:0">
+  <div class="deals-heading">🎟 My Redemptions</div>
+  <div id="customer-redemptions-list" style="display:flex;flex-direction:column;gap:12px"></div>
+</div>
   <div id="customer-reservations-list" style="display:flex;flex-direction:column;gap:12px"></div>
 </div>
 
@@ -1119,6 +1123,10 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
         <div class="sb-link" onclick="pane('r-hours',this)"><span class="ico">🕐</span>Opening Hours</div>
         <div class="sb-link" onclick="pane('r-reservations',this)"><span class="ico">📅</span>Reservations</div>
         <div class="sb-link" onclick="pane('r-verify',this)"><span class="ico">✅</span>Verify Coupon</div>
+         <div class="panel" style="margin-top:18px">
+  <div class="panel-head">Recent Redemptions</div>
+  <div id="restaurant-redemptions-list" style="display:flex;flex-direction:column;gap:10px"></div>
+</div>
         <div class="sb-sec">Account</div>
         <div class="sb-link" onclick="pane('r-profile',this)"><span class="ico">🏪</span>Profile</div>
         <div class="sb-link" onclick="pane('r-billing',this)"><span class="ico">💳</span>Billing</div>
@@ -1859,6 +1867,7 @@ async function initRestaurant(){
   await loadRestaurantHours();
   await loadRestaurantOffers();
    await loadRestaurantReservations();
+   await loadRestaurantRedemptions();
 }
 const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const DEF_HRS=[['12:00','23:00'],['12:00','23:00'],['12:00','23:00'],['12:00','23:00'],['12:00','00:00'],['11:00','00:00'],['11:00','22:00']];
@@ -1882,6 +1891,83 @@ function buildHours(){
       </div>`;
     g.appendChild(row);
   });
+}
+   async function loadCustomerRedemptions(){
+  const { data: authData, error: authError } = await supabaseClient.auth.getUser();
+
+  if(authError || !authData?.user){
+    console.error('No authenticated customer found', authError);
+    return;
+  }
+
+  const { data: redemptions, error: redemptionsError } = await supabaseClient
+    .from('redemptions')
+    .select('*')
+    .eq('customer_id', authData.user.id)
+    .order('created_at', { ascending: false });
+
+  if(redemptionsError){
+    console.error('Error loading customer redemptions:', redemptionsError);
+    return;
+  }
+
+  const list = document.getElementById('customer-redemptions-list');
+  if(!list) return;
+
+  if(!redemptions || !redemptions.length){
+    list.innerHTML = `
+      <div style="color:var(--text-muted);padding:10px 0">
+        No redemptions yet
+      </div>
+    `;
+    return;
+  }
+
+  const offerIds = [...new Set(redemptions.map(r => r.offer_id).filter(Boolean))];
+  const restaurantIds = [...new Set(redemptions.map(r => r.restaurant_id).filter(Boolean))];
+
+  const { data: offers } = await supabaseClient
+    .from('offers')
+    .select('id, title')
+    .in('id', offerIds);
+
+  const { data: restaurants } = await supabaseClient
+    .from('restaurants')
+    .select('id, name')
+    .in('id', restaurantIds);
+
+  const offerMap = {};
+  (offers || []).forEach(o => offerMap[o.id] = o);
+
+  const restaurantMap = {};
+  (restaurants || []).forEach(r => restaurantMap[r.id] = r);
+
+  list.innerHTML = redemptions.map(r => {
+    const offer = offerMap[r.offer_id] || {};
+    const restaurant = restaurantMap[r.restaurant_id] || {};
+
+    return `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:.95rem;font-weight:600;color:var(--text);margin-bottom:3px">
+            ${offer.title || 'Offer'}
+          </div>
+          <div style="font-size:.8rem;color:var(--text-muted)">
+            ${restaurant.name || 'Restaurant'} · Code: ${r.code}
+          </div>
+        </div>
+        <div>
+          ${
+            r.status === 'redeemed'
+              ? '<span class="badge-green">Redeemed</span>'
+              : r.status === 'issued'
+              ? '<span class="badge-yellow">Issued</span>'
+              : '<span class="badge-red">Expired</span>'
+          }
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 function toggleDay(inp){
   const row=inp.closest('.hrs-row');
@@ -1967,6 +2053,70 @@ function toggleDay(inp){
     `;
   }).join('');
 }
+   async function loadRestaurantRedemptions(){
+  const restaurantId = await getCurrentRestaurantId();
+  if(!restaurantId) return;
+
+  const { data: redemptions, error } = await supabaseClient
+    .from('redemptions')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if(error){
+    console.error('Error loading restaurant redemptions:', error);
+    return;
+  }
+
+  const list = document.getElementById('restaurant-redemptions-list');
+  if(!list) return;
+
+  if(!redemptions || !redemptions.length){
+    list.innerHTML = `<div style="color:var(--text-muted)">No redemptions yet</div>`;
+    return;
+  }
+
+  const offerIds = [...new Set(redemptions.map(r => r.offer_id).filter(Boolean))];
+  const customerIds = [...new Set(redemptions.map(r => r.customer_id).filter(Boolean))];
+
+  const { data: offers } = await supabaseClient
+    .from('offers')
+    .select('id, title')
+    .in('id', offerIds);
+
+  const { data: customers } = await supabaseClient
+    .from('profiles')
+    .select('id, name')
+    .in('id', customerIds);
+
+  const offerMap = {};
+  (offers || []).forEach(o => offerMap[o.id] = o);
+
+  const customerMap = {};
+  (customers || []).forEach(c => customerMap[c.id] = c);
+
+  list.innerHTML = redemptions.map(r => {
+    const offer = offerMap[r.offer_id] || {};
+    const customer = customerMap[r.customer_id] || {};
+
+    return `
+      <div style="background:var(--surface2);border-radius:var(--r);padding:12px 14px;border:1px solid var(--border)">
+        <div style="font-size:.88rem;color:var(--text);font-weight:600">${offer.title || 'Offer'}</div>
+        <div style="font-size:.78rem;color:var(--text-muted)">
+          ${customer.name || 'Customer'} · ${r.code}
+        </div>
+        <div style="font-size:.75rem;margin-top:4px">
+          ${
+            r.status === 'redeemed'
+              ? '<span class="badge-green">Redeemed</span>'
+              : '<span class="badge-yellow">Issued</span>'
+          }
+        </div>
+      </div>
+    `;
+  }).join('');
+}
 function addTC(){
   const list=document.getElementById('tc-list');
   const d=document.createElement('div');
@@ -1981,6 +2131,7 @@ async function initCustomer(){
   await loadCurrentUserProfile();
   await loadCustomerDeals();
   await loadCustomerReservations();
+   await loadCustomerRedemptions();
 }
    async function loadRestaurantOffers(){
   const restaurantId = await getCurrentRestaurantId();
@@ -2722,6 +2873,8 @@ async function verifyCode(){
 
   res.className = 'verify-result valid';
   res.innerHTML = `✅ <strong>Valid!</strong> Code accepted and marked as redeemed.`;
+   loadRestaurantRedemptions();
+   loadRestaurantOffers();
 }
 function initManager(){
   const body=document.getElementById('users-body');
