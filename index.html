@@ -1543,14 +1543,7 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
       <!-- LIVE ACTIVITY -->
       <div class="pane" id="pane-m-activity">
         <div class="rdash-header"><h1>Live Activity</h1><p>Real-time events across the platform.</p></div>
-        <div class="activity-feed">
-          <div class="activity-item"><div class="act-icon">🎉</div><div><div class="act-text"><strong>Karim H.</strong> redeemed "30% Off Lunch" at <strong>Burgerlicious Beirut</strong></div><div class="act-time">2 minutes ago</div></div></div>
-          <div class="activity-item"><div class="act-icon">🆕</div><div><div class="act-text"><strong>Sarah M.</strong> created a new Gourmet account — plan: $19/month</div><div class="act-time">7 minutes ago</div></div></div>
-          <div class="activity-item"><div class="act-icon">🏪</div><div><div class="act-text"><strong>Sky Rooftop Bar</strong> submitted a new partner application</div><div class="act-time">18 minutes ago</div></div></div>
-          <div class="activity-item"><div class="act-icon">⚠️</div><div><div class="act-text"><strong>System:</strong> Coupon code <code style="color:var(--red);background:rgba(192,57,43,.1);padding:1px 5px;border-radius:4px">TD-BURG-X9Q2R1</code> was flagged — attempted use after expiry</div><div class="act-time">34 minutes ago</div></div></div>
-          <div class="activity-item"><div class="act-icon">💰</div><div><div class="act-text"><strong>Liza Beirut</strong> upgraded from Starter to Growth plan</div><div class="act-time">1 hour ago</div></div></div>
-          <div class="activity-item"><div class="act-icon">🚫</div><div><div class="act-text"><strong>Admin:</strong> Account <em><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2c4d4045024a4d47496c414d4540024f4341">[email&#160;protected]</a></em> was banned for coupon sharing</div><div class="act-time">2 hours ago</div></div></div>
-        </div>
+       <div class="activity-feed" id="manager-activity-feed"></div>
       </div>
       <!-- REVENUE -->
       <div class="pane" id="pane-m-revenue">
@@ -1735,29 +1728,40 @@ async function doLogin(){
 }
    async function loadManagerStats(){
   const [
-    profilesRes,
+    customersRes,
     restaurantsRes,
-    offersRes,
-    reservationsRes,
+    activeOffersRes,
     redemptionsRes
   ] = await Promise.all([
-    supabaseClient.from('profiles').select('*', { count: 'exact', head: true }),
-    supabaseClient.from('restaurants').select('*', { count: 'exact', head: true }),
-    supabaseClient.from('offers').select('*', { count: 'exact', head: true }),
-    supabaseClient.from('reservations').select('*', { count: 'exact', head: true }),
-    supabaseClient.from('redemptions').select('*', { count: 'exact', head: true })
+    supabaseClient
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'customer'),
+
+    supabaseClient
+      .from('restaurants')
+      .select('*', { count: 'exact', head: true }),
+
+    supabaseClient
+      .from('offers')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'active'),
+
+    supabaseClient
+      .from('redemptions')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'redeemed')
   ]);
 
-  const totalMembers = profilesRes.count || 0;
+  const totalMembers = customersRes.count || 0;
   const totalRestaurants = restaurantsRes.count || 0;
-  const totalOffers = offersRes.count || 0;
-  const totalReservations = reservationsRes.count || 0;
+  const activeDeals = activeOffersRes.count || 0;
   const totalRedemptions = redemptionsRes.count || 0;
 
   const vals = document.querySelectorAll('#pane-m-overview .sc-val');
   if(vals[0]) vals[0].textContent = totalMembers;
   if(vals[1]) vals[1].textContent = totalRestaurants;
-  if(vals[2]) vals[2].textContent = totalOffers;
+  if(vals[2]) vals[2].textContent = activeDeals;
   if(vals[3]) vals[3].textContent = totalRedemptions;
 }
 
@@ -1868,6 +1872,77 @@ async function doRegister(type){
     go('customer');
     initCustomer();
   }
+}
+   async function loadManagerActivity(){
+  const feed = document.getElementById('manager-activity-feed');
+  if(!feed) return;
+
+  const [reservationsRes, redemptionsRes, offersRes] = await Promise.all([
+    supabaseClient
+      .from('reservations')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5),
+
+    supabaseClient
+      .from('redemptions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5),
+
+    supabaseClient
+      .from('offers')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5)
+  ]);
+
+  const activities = [];
+
+  (reservationsRes.data || []).forEach(r => {
+    activities.push({
+      type: 'reservation',
+      created_at: r.created_at,
+      text: `New reservation for ${r.party_size} people on ${r.reserved_date} at ${r.reserved_time}`
+    });
+  });
+
+  (redemptionsRes.data || []).forEach(r => {
+    activities.push({
+      type: 'redemption',
+      created_at: r.created_at,
+      text: `Coupon code ${r.code} was issued with status ${r.status}`
+    });
+  });
+
+  (offersRes.data || []).forEach(o => {
+    activities.push({
+      type: 'offer',
+      created_at: o.created_at,
+      text: `Offer created: ${o.title}`
+    });
+  });
+
+  activities.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const latest = activities.slice(0, 10);
+
+  if(!latest.length){
+    feed.innerHTML = `<div style="color:var(--text-muted)">No activity yet</div>`;
+    return;
+  }
+
+  feed.innerHTML = latest.map(a => `
+    <div class="activity-item">
+      <div class="act-icon">
+        ${a.type === 'reservation' ? '📅' : a.type === 'redemption' ? '🎟️' : '🏷️'}
+      </div>
+      <div>
+        <div class="act-text">${a.text}</div>
+        <div class="act-time">${new Date(a.created_at).toLocaleString()}</div>
+      </div>
+    </div>
+  `).join('');
 }
 
 /* ─── RESTAURANT PANE SWITCHER ─── */
@@ -2908,6 +2983,7 @@ async function initManager(){
   await loadManagerStats();
   await loadManagerUsers();
   await loadManagerRestaurants();
+   await loadManagerActivity();
 }
    async function loadManagerUsers(){
   const { data, error } = await supabaseClient
@@ -2953,20 +3029,20 @@ async function initManager(){
   `).join('');
 }
    async function loadManagerRestaurants(){
-  const { data, error } = await supabaseClient
+  const { data: restaurants, error: restaurantsError } = await supabaseClient
     .from('restaurants')
     .select('*')
     .order('created_at', { ascending: false });
 
-  if(error){
-    console.error('Error loading manager restaurants:', error);
+  if(restaurantsError){
+    console.error('Error loading manager restaurants:', restaurantsError);
     return;
   }
 
   const tbody = document.querySelector('#pane-m-restaurants tbody');
   if(!tbody) return;
 
-  if(!data || !data.length){
+  if(!restaurants || !restaurants.length){
     tbody.innerHTML = `
       <tr>
         <td colspan="7" style="text-align:center;color:var(--text-muted)">No restaurants found</td>
@@ -2975,17 +3051,48 @@ async function initManager(){
     return;
   }
 
-  tbody.innerHTML = data.map(r => `
-    <tr>
-      <td><strong style="color:var(--text)">${r.name || '-'}</strong></td>
-      <td>${r.owner_id || '-'}</td>
-      <td>${r.location || '-'}</td>
-      <td><span class="badge-blue">Partner</span></td>
-      <td>-</td>
-      <td><span class="badge-green">Active</span></td>
-      <td><button class="btn-ghost">View</button></td>
-    </tr>
-  `).join('');
+  const ownerIds = [...new Set(restaurants.map(r => r.owner_id).filter(Boolean))];
+
+  const { data: owners, error: ownersError } = await supabaseClient
+    .from('profiles')
+    .select('id, name, email')
+    .in('id', ownerIds);
+
+  if(ownersError){
+    console.error('Error loading restaurant owners:', ownersError);
+    return;
+  }
+
+  const ownerMap = {};
+  (owners || []).forEach(o => {
+    ownerMap[o.id] = o;
+  });
+
+  const { data: offers } = await supabaseClient
+    .from('offers')
+    .select('id, restaurant_id');
+
+  const offerCountMap = {};
+  (offers || []).forEach(o => {
+    offerCountMap[o.restaurant_id] = (offerCountMap[o.restaurant_id] || 0) + 1;
+  });
+
+  tbody.innerHTML = restaurants.map(r => {
+    const owner = ownerMap[r.owner_id] || {};
+    const offerCount = offerCountMap[r.id] || 0;
+
+    return `
+      <tr>
+        <td><strong style="color:var(--text)">${r.name || '-'}</strong></td>
+        <td>${owner.name || owner.email || '-'}</td>
+        <td>${r.location || '-'}</td>
+        <td><span class="badge-blue">Partner</span></td>
+        <td>${offerCount}</td>
+        <td><span class="badge-green">Active</span></td>
+        <td><button class="btn-ghost">View</button></td>
+      </tr>
+    `;
+  }).join('');
 }
 function banUserRow(btn,name){
   const row=btn.closest('tr');
