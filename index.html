@@ -1732,6 +1732,33 @@ async function doLogin(){
 
   toast('Welcome back!','ok');
 }
+   async function loadManagerStats(){
+  const [
+    profilesRes,
+    restaurantsRes,
+    offersRes,
+    reservationsRes,
+    redemptionsRes
+  ] = await Promise.all([
+    supabaseClient.from('profiles').select('*', { count: 'exact', head: true }),
+    supabaseClient.from('restaurants').select('*', { count: 'exact', head: true }),
+    supabaseClient.from('offers').select('*', { count: 'exact', head: true }),
+    supabaseClient.from('reservations').select('*', { count: 'exact', head: true }),
+    supabaseClient.from('redemptions').select('*', { count: 'exact', head: true })
+  ]);
+
+  const totalMembers = profilesRes.count || 0;
+  const totalRestaurants = restaurantsRes.count || 0;
+  const totalOffers = offersRes.count || 0;
+  const totalReservations = reservationsRes.count || 0;
+  const totalRedemptions = redemptionsRes.count || 0;
+
+  const vals = document.querySelectorAll('#pane-m-overview .sc-val');
+  if(vals[0]) vals[0].textContent = totalMembers;
+  if(vals[1]) vals[1].textContent = totalRestaurants;
+  if(vals[2]) vals[2].textContent = totalOffers;
+  if(vals[3]) vals[3].textContent = totalRedemptions;
+}
 
 /* ─── REGISTER HANDLER ─── */
 async function doRegister(type){
@@ -2876,27 +2903,88 @@ async function verifyCode(){
    loadRestaurantRedemptions();
    loadRestaurantOffers();
 }
-function initManager(){
-  const body=document.getElementById('users-body');
-  if(!body||body.children.length) return;
-  FAKE_USERS.forEach(u=>{
-    const tr=document.createElement('tr');
-    if(u.status==='banned') tr.className='user-row-banned';
-    tr.innerHTML=`
-      <td><strong style="color:var(--text)">${u.name}</strong></td>
-      <td>${u.email}</td>
-      <td><span class="${u.plan==='Annual Pro'?'badge-blue':u.plan==='Gourmet'?'badge-green':'tag'}">${u.plan}</span></td>
-      <td>${u.joined}</td>
-      <td>${u.deals}</td>
-      <td><span class="${u.status==='banned'?'badge-red':'badge-green'}">${u.status==='banned'?'Banned':'Active'}</span></td>
+async function initManager(){
+  await loadManagerStats();
+  await loadManagerUsers();
+  await loadManagerRestaurants();
+}
+   async function loadManagerUsers(){
+  const { data, error } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if(error){
+    console.error('Error loading manager users:', error);
+    return;
+  }
+
+  const body = document.getElementById('users-body');
+  if(!body) return;
+
+  if(!data || !data.length){
+    body.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center;color:var(--text-muted)">No users found</td>
+      </tr>
+    `;
+    return;
+  }
+
+  body.innerHTML = data.map(u => `
+    <tr>
+      <td><strong style="color:var(--text)">${u.name || '-'}</strong></td>
+      <td>${u.email || '-'}</td>
       <td>
-        ${u.status==='banned'
-          ?`<button class="unban-btn" onclick="toast('Account unbanned ✅','ok')">Unban</button>`
-          :`<button class="btn-ghost" onclick="toast('Email sent','ok')" style="margin-right:4px">Email</button><button class="ban-btn" onclick="banUserRow(this,'${u.name}')">Ban</button>`
-        }
-      </td>`;
-    body.appendChild(tr);
-  });
+        <span class="${
+          u.plan_code === 'annual_pro' ? 'badge-blue' :
+          u.plan_code === 'gourmet' ? 'badge-green' :
+          'tag'
+        }">
+          ${u.plan_code || '-'}
+        </span>
+      </td>
+      <td>${u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
+      <td>-</td>
+      <td><span class="badge-green">Active</span></td>
+      <td><button class="btn-ghost">View</button></td>
+    </tr>
+  `).join('');
+}
+   async function loadManagerRestaurants(){
+  const { data, error } = await supabaseClient
+    .from('restaurants')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if(error){
+    console.error('Error loading manager restaurants:', error);
+    return;
+  }
+
+  const tbody = document.querySelector('#pane-m-restaurants tbody');
+  if(!tbody) return;
+
+  if(!data || !data.length){
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center;color:var(--text-muted)">No restaurants found</td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td><strong style="color:var(--text)">${r.name || '-'}</strong></td>
+      <td>${r.owner_id || '-'}</td>
+      <td>${r.location || '-'}</td>
+      <td><span class="badge-blue">Partner</span></td>
+      <td>-</td>
+      <td><span class="badge-green">Active</span></td>
+      <td><button class="btn-ghost">View</button></td>
+    </tr>
+  `).join('');
 }
 function banUserRow(btn,name){
   const row=btn.closest('tr');
