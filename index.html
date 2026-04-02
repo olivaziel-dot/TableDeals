@@ -3175,7 +3175,7 @@ async function initManager(){
       <td>${u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
       <td>-</td>
       <td><span class="badge-green">Active</span></td>
-      <td><button class="btn-ghost">View</button></td>
+      <td><button class="btn-ghost" onclick="managerViewUser('${u.id}')">View</button></td>
     </tr>
   `).join('');
 }
@@ -3240,7 +3240,7 @@ async function initManager(){
         <td><span class="badge-blue">Partner</span></td>
         <td>${offerCount}</td>
         <td><span class="badge-green">Active</span></td>
-        <td><button class="btn-ghost">View</button></td>
+        <td><button class="btn-ghost" onclick="managerViewUser('${u.id}')">View</button></td>
       </tr>
     `;
   }).join('');
@@ -3296,6 +3296,27 @@ function banUserRow(btn,name){
 
   toast('Reservation request sent! ✅', 'ok');
       loadCustomerReservations();
+}
+   async function managerViewUser(userId){
+  const { data, error } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if(error || !data){
+    console.error('Error loading user details:', error);
+    toast('Could not load user details', 'err');
+    return;
+  }
+
+  alert(
+    `Name: ${data.name || '-'}\n` +
+    `Email: ${data.email || '-'}\n` +
+    `Role: ${data.role || '-'}\n` +
+    `Plan: ${data.plan_code || '-'}\n` +
+    `District: ${data.district || '-'}`
+  );
 }
    async function loadRestaurantReservations(){
   const restaurantId = await getCurrentRestaurantId();
