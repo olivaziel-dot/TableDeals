@@ -1941,6 +1941,8 @@ async function doRegister(type){
   const feed = document.getElementById('manager-activity-feed');
   if(!feed) return;
 
+  feed.innerHTML = `<div style="color:var(--text-muted)">Loading activity...</div>`;
+
   const [reservationsRes, redemptionsRes, offersRes] = await Promise.all([
     supabaseClient
       .from('reservations')
@@ -1960,6 +1962,16 @@ async function doRegister(type){
       .order('created_at', { ascending: false })
       .limit(5)
   ]);
+
+  if(reservationsRes.error){
+    console.error('Manager activity reservations error:', reservationsRes.error);
+  }
+  if(redemptionsRes.error){
+    console.error('Manager activity redemptions error:', redemptionsRes.error);
+  }
+  if(offersRes.error){
+    console.error('Manager activity offers error:', offersRes.error);
+  }
 
   const activities = [];
 
@@ -2018,18 +2030,30 @@ function pane(id, linkEl){
   if(linkEl) linkEl.classList.add('on');
 }
    async function loadManagerOffers(){
+  const body = document.getElementById('manager-offers-body');
+  if(!body) return;
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="6" style="text-align:center;color:var(--text-muted)">Loading offers...</td>
+    </tr>
+  `;
+
   const { data: offers, error: offersError } = await supabaseClient
     .from('offers')
     .select('*')
     .order('created_at', { ascending: false });
 
   if(offersError){
-    console.error('Error loading manager offers:', offersError);
+    console.error('Error loading manager offers FULL:', JSON.stringify(offersError, null, 2));
+    console.error('Error loading manager offers RAW:', offersError);
+    body.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align:center;color:var(--red)">Could not load offers</td>
+      </tr>
+    `;
     return;
   }
-
-  const body = document.getElementById('manager-offers-body');
-  if(!body) return;
 
   if(!offers || !offers.length){
     body.innerHTML = `
@@ -2048,7 +2072,13 @@ function pane(id, linkEl){
     .in('id', restaurantIds);
 
   if(restaurantsError){
-    console.error('Error loading restaurants for offers:', restaurantsError);
+    console.error('Error loading restaurants for offers FULL:', JSON.stringify(restaurantsError, null, 2));
+    console.error('Error loading restaurants for offers RAW:', restaurantsError);
+    body.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align:center;color:var(--red)">Could not load restaurant names</td>
+      </tr>
+    `;
     return;
   }
 
@@ -2088,22 +2118,26 @@ function pane(id, linkEl){
   }).join('');
 }
    async function managerToggleOfferStatus(offerId, newStatus){
-  const { error } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from('offers')
     .update({ status: newStatus })
-    .eq('id', offerId);
+    .eq('id', offerId)
+    .select();
 
   if(error){
-    console.error('Manager offer status update error:', error);
-    toast('Could not update offer status', 'err');
+    console.error('Manager offer status update error FULL:', JSON.stringify(error, null, 2));
+    console.error('Manager offer status update error RAW:', error);
+    toast(error.message || 'Could not update offer status', 'err');
     return;
   }
 
+  console.log('Manager updated offer:', data);
+
   toast(`Offer ${newStatus === 'active' ? 'activated' : 'paused'}!`, 'ok');
+
   await loadManagerOffers();
   await loadManagerStats();
 }
-
 /* ─── MANAGER PANE SWITCHER ─── */
 function paneM(id, linkEl){
   document.querySelectorAll('#page-manager .pane').forEach(p=>p.classList.remove('on'));
