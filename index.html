@@ -1139,6 +1139,12 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
       </div>
     </aside>
     <main class="rdash-main">
+       <div class="pane on" id="pane-r-overview">
+  <div class="rdash-header">
+    <h1>Restaurant Dashboard</h1>
+    <p>Welcome to your restaurant dashboard.</p>
+  </div>
+</div>
       <!-- OVERVIEW -->
       <div class="pane on" id="pane-r-overview">
         <div class="rdash-header"><h1>Dashboard</h1><p>Good morning — here's how Burgerlicious is performing.</p></div>
@@ -2200,10 +2206,17 @@ async function doRegister(type){
 
 /* ─── RESTAURANT PANE SWITCHER ─── */
 function pane(id, linkEl){
-  document.querySelectorAll('#page-restaurant .pane').forEach(p=>p.classList.remove('on'));
-  const el=document.getElementById('pane-'+id);
-  if(el) el.classList.add('on');
-  document.querySelectorAll('#page-restaurant .sb-link').forEach(l=>l.classList.remove('on'));
+  document.querySelectorAll('#page-restaurant .pane').forEach(p => p.classList.remove('on'));
+
+  const el = document.getElementById('pane-' + id);
+  if(!el){
+    console.error('Restaurant pane not found:', 'pane-' + id);
+    return;
+  }
+
+  el.classList.add('on');
+
+  document.querySelectorAll('#page-restaurant .sb-link').forEach(l => l.classList.remove('on'));
   if(linkEl) linkEl.classList.add('on');
 }
   async function loadManagerOffers(){
