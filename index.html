@@ -2090,7 +2090,7 @@ function pane(id, linkEl){
   document.querySelectorAll('#page-restaurant .sb-link').forEach(l=>l.classList.remove('on'));
   if(linkEl) linkEl.classList.add('on');
 }
-   async function loadManagerOffers(){
+  async function loadManagerOffers(){
   const body = document.getElementById('manager-offers-body');
 
   if(!body){
@@ -2131,11 +2131,12 @@ function pane(id, linkEl){
   const restaurantIds = [...new Set(offers.map(o => o.restaurant_id).filter(Boolean))];
 
   let restaurantMap = {};
+  let ownerMap = {};
 
   if(restaurantIds.length){
     const { data: restaurants, error: restaurantsError } = await supabaseClient
       .from('restaurants')
-      .select('id, name, status')
+      .select('id, name, status, owner_id')
       .in('id', restaurantIds);
 
     if(restaurantsError){
@@ -2144,15 +2145,38 @@ function pane(id, linkEl){
       (restaurants || []).forEach(r => {
         restaurantMap[r.id] = r;
       });
+
+      const ownerIds = [...new Set((restaurants || []).map(r => r.owner_id).filter(Boolean))];
+
+      if(ownerIds.length){
+        const { data: owners, error: ownersError } = await supabaseClient
+          .from('profiles')
+          .select('id, is_banned')
+          .in('id', ownerIds);
+
+        if(ownersError){
+          console.error('Error loading restaurant owners for manager offers:', ownersError);
+        } else {
+          (owners || []).forEach(owner => {
+            ownerMap[owner.id] = owner;
+          });
+        }
+      }
     }
   }
 
   body.innerHTML = offers.map(o => {
     const restaurant = restaurantMap[o.restaurant_id] || {};
+    const owner = ownerMap[restaurant.owner_id] || {};
+
     const restaurantSuspended = restaurant.status === 'suspended';
+    const ownerBanned = owner.is_banned === true;
+    const effectivelyInactive = restaurantSuspended || ownerBanned;
 
     let statusHtml = '';
-    if(restaurantSuspended){
+    if(ownerBanned){
+      statusHtml = '<span class="badge-red">● Owner Banned</span>';
+    } else if(restaurantSuspended){
       statusHtml = '<span class="badge-red">● Restaurant Suspended</span>';
     } else if(o.status === 'active'){
       statusHtml = '<span class="badge-green">● Active</span>';
@@ -2162,9 +2186,16 @@ function pane(id, linkEl){
       statusHtml = '<span class="badge-red">● Paused</span>';
     }
 
+    let restaurantInfo = restaurant.name || '-';
+    if(ownerBanned){
+      restaurantInfo += `<br/><span style="font-size:.72rem;color:#e74c3c">Owner account banned</span>`;
+    } else if(restaurantSuspended){
+      restaurantInfo += `<br/><span style="font-size:.72rem;color:#e74c3c">Restaurant suspended</span>`;
+    }
+
     let actionHtml = '';
-    if(restaurantSuspended){
-      actionHtml = `<span style="font-size:.78rem;color:var(--text-dim)">Restaurant suspended</span>`;
+    if(effectivelyInactive){
+      actionHtml = `<span style="font-size:.78rem;color:var(--text-dim)">Inactive by admin action</span>`;
     } else {
       actionHtml = `
         <button class="btn-ghost" onclick="managerToggleOfferStatus('${o.id}','${o.status === 'active' ? 'paused' : 'active'}')">
@@ -2179,10 +2210,7 @@ function pane(id, linkEl){
           <strong style="color:var(--text)">${o.title || '-'}</strong><br/>
           <span style="font-size:.74rem;color:var(--text-dim)">${o.short_desc || ''}</span>
         </td>
-        <td>
-          ${restaurant.name || '-'}
-          ${restaurantSuspended ? `<br/><span style="font-size:.72rem;color:#e74c3c">Suspended restaurant</span>` : ''}
-        </td>
+        <td>${restaurantInfo}</td>
         <td>${o.category || '-'}</td>
         <td>${statusHtml}</td>
         <td>${o.created_at ? new Date(o.created_at).toLocaleDateString() : '-'}</td>
