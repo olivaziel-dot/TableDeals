@@ -822,7 +822,7 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
 <div id="page-login" class="page">
   <div class="auth-page">
     <div class="auth-bar">
-      <button class="auth-bar-back" onclick="go('landing')">← Back to Home</button>
+      <button class="auth-bar-back" onclick="doLogout()">← Back to Home</button>
       <div class="nav-logo" style="font-size:1.35rem">Table<span>Deal</span></div>
       <div style="width:130px;text-align:right"><a style="font-size:.82rem;color:var(--text-muted);cursor:pointer" onclick="go('register')">Create account →</a></div>
     </div>
@@ -858,7 +858,7 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
 <div id="page-register" class="page">
   <div class="auth-page">
     <div class="auth-bar">
-      <button class="auth-bar-back" onclick="go('landing')">← Back to Home</button>
+      <button class="auth-bar-back" onclick="doLogout()">← Back to Home</button>
       <div class="nav-logo" style="font-size:1.35rem">Table<span>Deal</span></div>
       <div style="width:130px;text-align:right"><a style="font-size:.82rem;color:var(--text-muted);cursor:pointer" onclick="go('login')">Sign in →</a></div>
     </div>
@@ -1003,7 +1003,7 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
   <div class="u-avatar" id="user-avatar">U</div>
   <span class="u-name" id="user-name">User</span>
   <span class="tag" id="user-plan">Member</span>
-  <button class="u-logout" onclick="go('landing')">↩ Logout</button>
+  <button class="u-logout" onclick="doLogout()">↩ Logout</button>
 </div>
     </div>
   </nav>
@@ -1135,7 +1135,7 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
       <div class="sb-foot">
         <div class="sb-rest-name" id="restaurant-display-name">Restaurant</div>
         <div class="sb-status">Live & Active</div>
-        <button class="btn-ghost" style="width:100%;margin-top:10px" onclick="go('landing')">↩ Sign Out</button>
+        <button class="btn-ghost" style="width:100%;margin-top:10px" onclick="doLogout()">↩ Sign Out</button>
       </div>
     </aside>
     <main class="rdash-main">
@@ -1454,7 +1454,7 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
       <div class="sb-foot">
         <div class="sb-rest-name">Manager Account</div>
         <div style="font-size:.72rem;color:var(--purple,#bb8fce);display:flex;align-items:center;gap:4px;margin-top:3px">🛡️ Full Admin Access</div>
-        <button class="btn-ghost" style="width:100%;margin-top:10px" onclick="go('landing')">↩ Sign Out</button>
+        <button class="btn-ghost" style="width:100%;margin-top:10px" onclick="doLogout()">↩ Sign Out</button>
       </div>
     </aside>
     <main class="rdash-main">
@@ -2005,6 +2005,56 @@ async function doRegister(type){
     go('customer');
     initCustomer();
   }
+}
+   async function handleInitialSession(){
+  const { data, error } = await supabaseClient.auth.getSession();
+
+  if(error){
+    console.error('Session check error:', error);
+    return;
+  }
+
+  const session = data?.session;
+  if(!session || !session.user) return;
+
+  const userId = session.user.id;
+
+  const { data: profile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if(profileError || !profile){
+    console.error('Initial profile load error:', profileError);
+    return;
+  }
+
+  if(profile.is_banned){
+    await supabaseClient.auth.signOut();
+    await go('account-banned');
+    return;
+  }
+
+  if(profile.role === 'manager'){
+    await go('manager');
+    return;
+  }
+
+  if(profile.role === 'restaurant'){
+    const restaurant = await getCurrentRestaurant();
+
+    if(restaurant && restaurant.status === 'suspended'){
+      await supabaseClient.auth.signOut();
+      await go('restaurant-suspended');
+      return;
+    }
+
+    await go('restaurant');
+    return;
+  }
+
+  await go('customer');
 }
    async function loadManagerActivity(){
   const feed = document.getElementById('manager-activity-feed');
@@ -3746,6 +3796,13 @@ function banUserRow(btn,name){
   await loadManagerUsers();
   await loadManagerBannedUsers();
 }
+   supabaseClient.auth.onAuthStateChange(async (event, session) => {
+  if(event === 'SIGNED_OUT'){
+    DEALS = [];
+    currentEditingOfferId = null;
+    _modalDeal = null;
+  }
+});
    async function managerViewUser(userId){
   const { data, error } = await supabaseClient
     .from('profiles')
@@ -3766,6 +3823,22 @@ function banUserRow(btn,name){
     `Plan: ${data.plan_code || '-'}\n` +
     `District: ${data.district || '-'}`
   );
+}
+   async function doLogout(){
+  const { error } = await supabaseClient.auth.signOut();
+
+  if(error){
+    console.error('Logout error:', error);
+    toast('Could not log out', 'err');
+    return;
+  }
+
+  DEALS = [];
+  currentEditingOfferId = null;
+  _modalDeal = null;
+
+  await go('landing');
+  toast('Logged out', 'ok');
 }
    async function loadRestaurantReservations(){
   const restaurantId = await getCurrentRestaurantId();
@@ -3834,7 +3907,10 @@ function toast(msg,type='ok'){
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 
 /* ─── BOOT ─── */
-window.addEventListener('DOMContentLoaded',()=>{buildHours();});
+window.addEventListener('DOMContentLoaded', async () => {
+  buildHours();
+  await handleInitialSession();
+});
 </script>
 
 <!-- ══════════════════ STATIC PAGES ══════════════════ -->
@@ -3843,7 +3919,7 @@ window.addEventListener('DOMContentLoaded',()=>{buildHours();});
 <div id="page-restaurants" class="page">
   <div class="auth-page">
     <div class="auth-bar">
-      <button class="auth-bar-back" onclick="go('landing')">← Back to Home</button>
+      <button class="auth-bar-back" onclick="doLogout()">← Back to Home</button>
       <div class="nav-logo" style="font-size:1.35rem">Table<span>Deal</span></div>
       <div style="width:130px;text-align:right"><button class="btn-gold" style="padding:8px 18px;font-size:.8rem" onclick="go('login')">Sign In</button></div>
     </div>
@@ -3882,7 +3958,7 @@ window.addEventListener('DOMContentLoaded',()=>{buildHours();});
 <div id="page-about" class="page">
   <div class="auth-page">
     <div class="auth-bar">
-      <button class="auth-bar-back" onclick="go('landing')">← Back to Home</button>
+      <button class="auth-bar-back" onclick="doLogout()">← Back to Home</button>
       <div class="nav-logo" style="font-size:1.35rem">Table<span>Deal</span></div>
       <div style="width:130px;text-align:right"><button class="btn-gold" style="padding:8px 18px;font-size:.8rem" onclick="go('register')">Get Started</button></div>
     </div>
@@ -3923,7 +3999,7 @@ window.addEventListener('DOMContentLoaded',()=>{buildHours();});
 <div id="page-help" class="page">
   <div class="auth-page">
     <div class="auth-bar">
-      <button class="auth-bar-back" onclick="go('landing')">← Back to Home</button>
+      <button class="auth-bar-back" onclick="doLogout()">← Back to Home</button>
       <div class="nav-logo" style="font-size:1.35rem">Table<span>Deal</span></div>
       <div style="width:130px"></div>
     </div>
@@ -3977,7 +4053,7 @@ window.addEventListener('DOMContentLoaded',()=>{buildHours();});
 <div id="page-contact" class="page">
   <div class="auth-page">
     <div class="auth-bar">
-      <button class="auth-bar-back" onclick="go('landing')">← Back to Home</button>
+      <button class="auth-bar-back" onclick="doLogout()">← Back to Home</button>
       <div class="nav-logo" style="font-size:1.35rem">Table<span>Deal</span></div>
       <div style="width:130px"></div>
     </div>
@@ -4033,7 +4109,7 @@ window.addEventListener('DOMContentLoaded',()=>{buildHours();});
 <div id="page-privacy" class="page">
   <div class="auth-page">
     <div class="auth-bar">
-      <button class="auth-bar-back" onclick="go('landing')">← Back to Home</button>
+      <button class="auth-bar-back" onclick="doLogout()">← Back to Home</button>
       <div class="nav-logo" style="font-size:1.35rem">Table<span>Deal</span></div>
       <div style="width:130px"></div>
     </div>
@@ -4087,7 +4163,7 @@ window.addEventListener('DOMContentLoaded',()=>{buildHours();});
 <div id="page-terms" class="page">
   <div class="auth-page">
     <div class="auth-bar">
-      <button class="auth-bar-back" onclick="go('landing')">← Back to Home</button>
+      <button class="auth-bar-back" onclick="doLogout()">← Back to Home</button>
       <div class="nav-logo" style="font-size:1.35rem">Table<span>Deal</span></div>
       <div style="width:130px"></div>
     </div>
@@ -4235,7 +4311,7 @@ function submitContact(){
    <div id="page-account-banned" class="page">
   <div class="auth-page">
     <div class="auth-bar">
-      <button class="auth-bar-back" onclick="go('landing')">← Back to Home</button>
+      <button class="auth-bar-back" onclick="doLogout()">← Back to Home</button>
       <div class="nav-logo" style="font-size:1.35rem">Table<span>Deal</span></div>
       <div style="width:130px"></div>
     </div>
@@ -4256,7 +4332,7 @@ function submitContact(){
 <div id="page-restaurant-suspended" class="page">
   <div class="auth-page">
     <div class="auth-bar">
-      <button class="auth-bar-back" onclick="go('landing')">← Back to Home</button>
+      <button class="auth-bar-back" onclick="doLogout()">← Back to Home</button>
       <div class="nav-logo" style="font-size:1.35rem">Table<span>Deal</span></div>
       <div style="width:130px"></div>
     </div>
