@@ -1821,10 +1821,11 @@ async function doLogin(){
   const [
     customersRes,
     restaurantsRes,
-    activeOffersRes,
+    offersRes,
     redemptionsRes,
     reservationsRes,
-    pendingReservationsRes
+    pendingReservationsRes,
+    activeRestaurantsData
   ] = await Promise.all([
     supabaseClient
       .from('profiles')
@@ -1833,12 +1834,12 @@ async function doLogin(){
 
     supabaseClient
       .from('restaurants')
-      .select('*', { count: 'exact', head: true }),
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'active'),
 
     supabaseClient
       .from('offers')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'active'),
+      .select('*'),
 
     supabaseClient
       .from('redemptions')
@@ -1852,12 +1853,22 @@ async function doLogin(){
     supabaseClient
       .from('reservations')
       .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending')
+      .eq('status', 'pending'),
+
+    supabaseClient
+      .from('restaurants')
+      .select('id')
+      .eq('status', 'active')
   ]);
+
+  const activeRestaurantIds = new Set((activeRestaurantsData.data || []).map(r => r.id));
+
+  const activeDeals = (offersRes.data || []).filter(o =>
+    o.status === 'active' && activeRestaurantIds.has(o.restaurant_id)
+  ).length;
 
   const totalMembers = customersRes.count || 0;
   const totalRestaurants = restaurantsRes.count || 0;
-  const activeDeals = activeOffersRes.count || 0;
   const totalRedemptions = redemptionsRes.count || 0;
   const totalReservations = reservationsRes.count || 0;
   const pendingReservations = pendingReservationsRes.count || 0;
@@ -2081,7 +2092,11 @@ function pane(id, linkEl){
 }
    async function loadManagerOffers(){
   const body = document.getElementById('manager-offers-body');
-  if(!body) return;
+
+  if(!body){
+    console.error('manager-offers-body not found');
+    return;
+  }
 
   body.innerHTML = `
     <tr>
@@ -2095,8 +2110,7 @@ function pane(id, linkEl){
     .order('created_at', { ascending: false });
 
   if(offersError){
-    console.error('Error loading manager offers FULL:', JSON.stringify(offersError, null, 2));
-    console.error('Error loading manager offers RAW:', offersError);
+    console.error('Error loading manager offers:', offersError);
     body.innerHTML = `
       <tr>
         <td colspan="6" style="text-align:center;color:var(--red)">Could not load offers</td>
@@ -2116,29 +2130,48 @@ function pane(id, linkEl){
 
   const restaurantIds = [...new Set(offers.map(o => o.restaurant_id).filter(Boolean))];
 
-  const { data: restaurants, error: restaurantsError } = await supabaseClient
-    .from('restaurants')
-    .select('id, name')
-    .in('id', restaurantIds);
+  let restaurantMap = {};
 
-  if(restaurantsError){
-    console.error('Error loading restaurants for offers FULL:', JSON.stringify(restaurantsError, null, 2));
-    console.error('Error loading restaurants for offers RAW:', restaurantsError);
-    body.innerHTML = `
-      <tr>
-        <td colspan="6" style="text-align:center;color:var(--red)">Could not load restaurant names</td>
-      </tr>
-    `;
-    return;
+  if(restaurantIds.length){
+    const { data: restaurants, error: restaurantsError } = await supabaseClient
+      .from('restaurants')
+      .select('id, name, status')
+      .in('id', restaurantIds);
+
+    if(restaurantsError){
+      console.error('Error loading restaurants for manager offers:', restaurantsError);
+    } else {
+      (restaurants || []).forEach(r => {
+        restaurantMap[r.id] = r;
+      });
+    }
   }
-
-  const restaurantMap = {};
-  (restaurants || []).forEach(r => {
-    restaurantMap[r.id] = r;
-  });
 
   body.innerHTML = offers.map(o => {
     const restaurant = restaurantMap[o.restaurant_id] || {};
+    const restaurantSuspended = restaurant.status === 'suspended';
+
+    let statusHtml = '';
+    if(restaurantSuspended){
+      statusHtml = '<span class="badge-red">● Restaurant Suspended</span>';
+    } else if(o.status === 'active'){
+      statusHtml = '<span class="badge-green">● Active</span>';
+    } else if(o.status === 'draft'){
+      statusHtml = '<span class="badge-yellow">● Draft</span>';
+    } else {
+      statusHtml = '<span class="badge-red">● Paused</span>';
+    }
+
+    let actionHtml = '';
+    if(restaurantSuspended){
+      actionHtml = `<span style="font-size:.78rem;color:var(--text-dim)">Restaurant suspended</span>`;
+    } else {
+      actionHtml = `
+        <button class="btn-ghost" onclick="managerToggleOfferStatus('${o.id}','${o.status === 'active' ? 'paused' : 'active'}')">
+          ${o.status === 'active' ? 'Pause' : 'Activate'}
+        </button>
+      `;
+    }
 
     return `
       <tr>
@@ -2146,23 +2179,14 @@ function pane(id, linkEl){
           <strong style="color:var(--text)">${o.title || '-'}</strong><br/>
           <span style="font-size:.74rem;color:var(--text-dim)">${o.short_desc || ''}</span>
         </td>
-        <td>${restaurant.name || '-'}</td>
+        <td>
+          ${restaurant.name || '-'}
+          ${restaurantSuspended ? `<br/><span style="font-size:.72rem;color:#e74c3c">Suspended restaurant</span>` : ''}
+        </td>
         <td>${o.category || '-'}</td>
-        <td>
-          ${
-            o.status === 'active'
-              ? '<span class="badge-green">● Active</span>'
-              : o.status === 'draft'
-              ? '<span class="badge-yellow">● Draft</span>'
-              : '<span class="badge-red">● Paused</span>'
-          }
-        </td>
+        <td>${statusHtml}</td>
         <td>${o.created_at ? new Date(o.created_at).toLocaleDateString() : '-'}</td>
-        <td>
-          <button class="btn-ghost" onclick="managerToggleOfferStatus('${o.id}','${o.status === 'active' ? 'paused' : 'active'}')">
-            ${o.status === 'active' ? 'Pause' : 'Activate'}
-          </button>
-        </td>
+        <td>${actionHtml}</td>
       </tr>
     `;
   }).join('');
