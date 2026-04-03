@@ -1747,36 +1747,75 @@ async function doLogin(){
     return;
   }
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
 
   if(error){
     toast(error.message,'err');
     return;
   }
 
+  const user = data?.user;
+  if(!user){
+    toast('Login failed','err');
+    return;
+  }
+
   const { data: profile, error: profileError } = await supabaseClient
     .from('profiles')
     .select('*')
-    .eq('id', data.user.id)
+    .eq('id', user.id)
     .single();
 
-  if(profileError){
-    toast('Error loading profile','err');
+  if(profileError || !profile){
+    console.error('Profile load error:', profileError);
+    toast('Profile could not be loaded','err');
+    return;
+  }
+
+  if(profile.is_banned){
+    await supabaseClient.auth.signOut();
+    toast('This account has been suspended','err');
     return;
   }
 
   if(profile.role === 'manager'){
-    go('manager');
-    initManager();
-  } else if(profile.role === 'restaurant'){
-    go('restaurant');
-    initRestaurant();
-  } else {
-    go('customer');
-    initCustomer();
+    await go('manager');
+    toast('Welcome back!','ok');
+    return;
   }
 
+  if(profile.role === 'restaurant'){
+    await go('restaurant');
+    toast('Welcome back!','ok');
+    return;
+  }
+
+  await go('customer');
   toast('Welcome back!','ok');
+}
+   async function getCurrentRestaurant(){
+  const { data: authData, error: authError } = await supabaseClient.auth.getUser();
+
+  if(authError || !authData?.user){
+    console.error('Auth user not found:', authError);
+    return null;
+  }
+
+  const { data: restaurant, error } = await supabaseClient
+    .from('restaurants')
+    .select('*')
+    .eq('owner_id', authData.user.id)
+    .single();
+
+  if(error){
+    console.error('Restaurant not found:', error);
+    return null;
+  }
+
+  return restaurant;
 }
    async function loadManagerStats(){
   const [
@@ -2264,7 +2303,13 @@ async function paneM(id, linkEl){
 
 /* ─── RESTAURANT INIT ─── */
 async function initRestaurant(){
-  loadCurrentRestaurant();
+  const restaurant = await getCurrentRestaurant();
+
+  if(restaurant && restaurant.status === 'suspended'){
+    toast('Your restaurant account is suspended','err');
+    await go('landing');
+    return;
+  }
   buildHours();
   await loadRestaurantHours();
   await loadRestaurantOffers();
@@ -2679,17 +2724,23 @@ async function initCustomer(){
   toast('Offer loaded for editing', 'ok');
 }
   async function saveOffer(status = 'draft'){
-  const restaurantId = await getCurrentRestaurantId();
+  const restaurant = await getCurrentRestaurant();
 
-  if(!restaurantId){
+  if(!restaurant){
     toast('Restaurant not found', 'err');
     return;
   }
 
+  if(restaurant.status === 'suspended'){
+    toast('Suspended restaurants cannot create offers', 'err');
+    return;
+  }
+
+  const restaurantId = restaurant.id;
+
   const title = document.getElementById('offer-title')?.value?.trim() || '';
   const shortDesc = document.getElementById('offer-short-desc')?.value?.trim() || '';
   const fullDesc = document.getElementById('offer-full-desc')?.value?.trim() || '';
-     const imageUrl = document.getElementById('offer-image-url')?.value?.trim() || null;
   const discountType = document.getElementById('offer-discount-type')?.value || null;
   const discountValue = document.getElementById('offer-discount-value')?.value?.trim() || null;
   const originalPrice = document.getElementById('offer-original-price')?.value?.trim() || null;
@@ -2698,112 +2749,69 @@ async function initCustomer(){
   const startTime = document.getElementById('offer-start-time')?.value || null;
   const endTime = document.getElementById('offer-end-time')?.value || null;
 
-  const selectedCategoryEl = document.querySelector('#offer-category-group .chip.on');
-  const category = selectedCategoryEl?.dataset?.category || null;
+  const selectedCategoryChip = document.querySelector('#pane-r-add .chip-group .chip.on');
+  const category = selectedCategoryChip
+    ? selectedCategoryChip.textContent.replace(/[^\p{L}\p{N}\s]/gu, '').trim().toLowerCase()
+    : null;
 
-  const termInputs = [...document.querySelectorAll('#tc-list input')];
-  const terms = termInputs
-    .map((input, index) => ({
-      term_text: input.value.trim(),
-      sort_order: index
-    }))
-    .filter(term => term.term_text);
+  const terms = [...document.querySelectorAll('#tc-list input')]
+    .map(input => input.value.trim())
+    .filter(Boolean);
 
   if(!title){
     toast('Offer title is required', 'err');
     return;
   }
 
-  const offerPayload = {
-  restaurant_id: restaurantId,
-  title,
-  short_desc: shortDesc,
-  full_desc: fullDesc,
-  image_url: imageUrl,
-  discount_type: discountType,
-  discount_value: discountValue,
-  original_price: originalPrice,
-  category,
-  valid_from: validFrom,
-  valid_until: validUntil,
-  start_time: startTime,
-  end_time: endTime,
-  status
-};
+  const { data: insertedOffer, error } = await supabaseClient
+    .from('offers')
+    .insert([{
+      restaurant_id: restaurantId,
+      title,
+      short_desc: shortDesc,
+      full_desc: fullDesc,
+      discount_type: discountType,
+      discount_value: discountValue,
+      original_price: originalPrice,
+      category,
+      valid_from: validFrom,
+      valid_until: validUntil,
+      start_time: startTime,
+      end_time: endTime,
+      status
+    }])
+    .select()
+    .single();
 
-  let savedOffer = null;
-  let offerError = null;
-
-  if(currentEditingOfferId){
-    const { data, error } = await supabaseClient
-      .from('offers')
-      .update(offerPayload)
-      .eq('id', currentEditingOfferId)
-      .select()
-      .single();
-
-    savedOffer = data;
-    offerError = error;
-  } else {
-    const { data, error } = await supabaseClient
-      .from('offers')
-      .insert([offerPayload])
-      .select()
-      .single();
-
-    savedOffer = data;
-    offerError = error;
-  }
-
-  if(offerError){
-    console.error('Offer save error FULL:', JSON.stringify(offerError, null, 2));
-    console.error('Offer save error RAW:', offerError);
-    toast(offerError.message || 'Could not save offer', 'err');
+  if(error){
+    console.error('Offer save error:', error);
+    toast(error.message || 'Could not save offer', 'err');
     return;
   }
 
-  if(savedOffer?.id){
-    const { error: deleteTermsError } = await supabaseClient
+  if(terms.length){
+    const rows = terms.map((term, index) => ({
+      offer_id: insertedOffer.id,
+      term_text: term,
+      sort_order: index
+    }));
+
+    const { error: termsError } = await supabaseClient
       .from('offer_terms')
-      .delete()
-      .eq('offer_id', savedOffer.id);
+      .insert(rows);
 
-    if(deleteTermsError){
-      console.error('Could not clear old terms:', deleteTermsError);
-      toast('Offer saved, but terms cleanup failed', 'err');
+    if(termsError){
+      console.error('Offer terms save error:', termsError);
+      toast('Offer saved, but terms could not be saved', 'err');
+      await loadRestaurantOffers();
       return;
-    }
-
-    if(terms.length){
-      const termPayload = terms.map(term => ({
-        offer_id: savedOffer.id,
-        term_text: term.term_text,
-        sort_order: term.sort_order
-      }));
-
-      const { error: termsError } = await supabaseClient
-        .from('offer_terms')
-        .insert(termPayload);
-
-      if(termsError){
-        console.error('Offer terms save error FULL:', JSON.stringify(termsError, null, 2));
-        console.error('Offer terms save error RAW:', termsError);
-        toast(termsError.message || 'Offer saved, but terms could not be saved', 'err');
-        return;
-      }
     }
   }
 
-  currentEditingOfferId = null;
-
-  toast(
-    status === 'active'
-      ? (savedOffer ? 'Offer saved! 🎉' : 'Offer published! 🎉')
-      : 'Saved as draft!',
-    'ok'
-  );
-
-  loadRestaurantOffers();
+  toast(status === 'active' ? 'Offer published! 🎉' : 'Saved as draft!', 'ok');
+  await loadRestaurantOffers();
+  await loadManagerOffers?.();
+  await loadManagerStats?.();
 }
    async function changeOfferStatus(offerId, newStatus){
   const { error } = await supabaseClient
@@ -2917,15 +2925,14 @@ function liveCode(dealKey){
   return `TD-${dealKey}-${b36}`;
 }
    async function loadCustomerDeals(){
-  const { data: offers, error: offersError } = await supabaseClient
+  const { data: offers, error } = await supabaseClient
     .from('offers')
     .select('*')
     .eq('status', 'active')
     .order('created_at', { ascending: false });
 
-  if(offersError){
-    console.error('Error loading offers:', offersError);
-    toast('Could not load deals', 'err');
+  if(error){
+    console.error('Error loading customer deals:', error);
     return;
   }
 
@@ -2937,14 +2944,14 @@ function liveCode(dealKey){
 
   const restaurantIds = [...new Set(offers.map(o => o.restaurant_id).filter(Boolean))];
 
-  const { data: restaurants, error: restaurantsError } = await supabaseClient
+  const { data: restaurants, error: restError } = await supabaseClient
     .from('restaurants')
-    .select('id, name, location')
-    .in('id', restaurantIds);
+    .select('*')
+    .in('id', restaurantIds)
+    .eq('status', 'active');
 
-  if(restaurantsError){
-    console.error('Error loading restaurants:', restaurantsError);
-    toast('Could not load restaurant details', 'err');
+  if(restError){
+    console.error('Error loading restaurants for customer deals:', restError);
     return;
   }
 
@@ -2953,30 +2960,45 @@ function liveCode(dealKey){
     restaurantMap[r.id] = r;
   });
 
-  DEALS = offers.map(o => {
+  const validOffers = offers.filter(o => restaurantMap[o.restaurant_id]);
+
+  const offerIds = validOffers.map(o => o.id);
+
+  let termsMap = {};
+  if(offerIds.length){
+    const { data: terms, error: termsError } = await supabaseClient
+      .from('offer_terms')
+      .select('*')
+      .in('offer_id', offerIds)
+      .order('sort_order', { ascending: true });
+
+    if(termsError){
+      console.error('Error loading offer terms:', termsError);
+    } else {
+      (terms || []).forEach(term => {
+        if(!termsMap[term.offer_id]) termsMap[term.offer_id] = [];
+        termsMap[term.offer_id].push(term.term_text);
+      });
+    }
+  }
+
+  DEALS = validOffers.map(o => {
     const restaurant = restaurantMap[o.restaurant_id] || {};
 
     return {
       id: o.id,
-      restaurant_id: o.restaurant_id,
       title: o.title || 'Untitled Offer',
       restaurant: restaurant.name || 'Restaurant',
       district: restaurant.location || 'Lebanon',
-      cat: o.category || 'other',
+      cat: o.category || 'deal',
       time: o.start_time ? 'lunch' : 'dinner',
-      img: o.image_url || 'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=500&q=75',
-      disc: o.discount_value || 'Deal',
-      orig: o.original_price || '-',
-      price: o.discount_value || '-',
-      desc: o.short_desc || o.full_desc || 'Special offer for TableDeal members.',
-      full_desc: o.full_desc || o.short_desc || 'Special offer for TableDeal members.',
-      tc: [],
-      dealKey: String(o.id).slice(0, 6).toUpperCase(),
-      valid_from: o.valid_from,
-      valid_until: o.valid_until,
-      start_time: o.start_time,
-      end_time: o.end_time,
-      discount_type: o.discount_type
+      img: o.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&q=75',
+      disc: o.discount_value || o.discount_type || 'Deal',
+      orig: o.original_price ? `$${o.original_price}` : '$0',
+      price: o.discount_value ? `${o.discount_value}` : 'Special',
+      desc: o.short_desc || o.full_desc || 'Exclusive restaurant deal',
+      tc: termsMap[o.id] || ['Valid at participating restaurant'],
+      dealKey: String(o.id).slice(0, 8).toUpperCase()
     };
   });
 
