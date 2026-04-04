@@ -1720,6 +1720,16 @@ async function go(name){
   } catch (err){
     console.error('go() init error for page:', name, err);
 
+    if(name === 'restaurant'){
+      await supabaseClient.auth.signOut();
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const fallback = document.getElementById('page-landing');
+      if(fallback) fallback.classList.add('active');
+      if(mainNav) mainNav.style.display = 'flex';
+      toast(err.message || 'Could not open restaurant dashboard', 'err');
+      return;
+    }
+
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     const fallback = document.getElementById('page-landing');
     if(fallback) fallback.classList.add('active');
@@ -1834,7 +1844,14 @@ async function doLogin(){
   if(profile.role === 'restaurant'){
     const restaurant = await getCurrentRestaurant();
 
-    if(restaurant && restaurant.status === 'suspended'){
+    if(!restaurant){
+      await supabaseClient.auth.signOut();
+      toast('Restaurant account is not set up correctly','err');
+      await go('landing');
+      return;
+    }
+
+    if(restaurant.status === 'suspended'){
       await supabaseClient.auth.signOut();
       await go('restaurant-suspended');
       return;
@@ -2488,38 +2505,31 @@ async function paneM(id, linkEl){
 
 /* ─── RESTAURANT INIT ─── */
 async function initRestaurant(){
-  try {
-    const restaurant = await getCurrentRestaurant();
+  const restaurant = await getCurrentRestaurant();
 
-    if(!restaurant){
-      console.error('initRestaurant: no restaurant found for this user');
-      await supabaseClient.auth.signOut();
-      await go('landing');
-      toast('Restaurant account is not set up correctly', 'err');
-      return;
-    }
-
-    if(restaurant.status === 'suspended'){
-      await supabaseClient.auth.signOut();
-      await go('restaurant-suspended');
-      return;
-    }
-
-    if(typeof buildHours === 'function'){
-  buildHours();
-} else {
-  console.error('buildHours is missing inside initRestaurant');
-}
-    await loadRestaurantHours();
-    await loadRestaurantOffers();
-    await loadRestaurantReservations();
-    await loadRestaurantRedemptions();
-  } catch(err){
-    console.error('initRestaurant error:', err);
-    await supabaseClient.auth.signOut();
-    await go('landing');
-    toast('Could not open restaurant dashboard', 'err');
+  if(!restaurant){
+    console.error('initRestaurant: no restaurant found for this user');
+    throw new Error('Restaurant account is not set up correctly');
   }
+
+  if(restaurant.status === 'suspended'){
+    throw new Error('Restaurant is suspended');
+  }
+
+  if(typeof buildHours === 'function'){
+    buildHours();
+  } else {
+    console.error('buildHours is missing inside initRestaurant');
+  }
+
+  console.log('Restaurant init start for:', restaurant);
+
+  await loadRestaurantHours();
+  await loadRestaurantOffers();
+  await loadRestaurantReservations();
+  await loadRestaurantRedemptions();
+
+  console.log('Restaurant init finished successfully');
 }
    async function loadCustomerRedemptions(){
   const { data: authData, error: authError } = await supabaseClient.auth.getUser();
