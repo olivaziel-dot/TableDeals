@@ -1201,9 +1201,12 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
             <div class="form-group"><label>Short Description (shown on card)</label><input class="input-field" id="offer-short-desc" placeholder="e.g. Valid at lunch, Mon–Fri"/></div>
             <div class="form-group"><label>Full Description</label><textarea class="input-field" id="offer-full-desc" rows="3" placeholder="Describe the full offer for the deal page…" style="resize:vertical"></textarea></div>
              <div class="form-group">
-         <label>Image URL</label>
-         <input class="input-field" id="offer-image-url" placeholder="https://example.com/your-offer-image.jpg"/>
-         </div>
+  <label>Offer Image</label>
+  <input class="input-field" id="offer-image-file" type="file" accept="image/*" onchange="previewOfferImage(event)"/>
+  <div id="offer-image-preview-wrap" style="margin-top:12px;display:none">
+    <img id="offer-image-preview" src="" alt="Offer preview" style="width:100%;max-width:320px;height:180px;object-fit:cover;border-radius:12px;border:1px solid var(--border);display:block"/>
+  </div>
+</div>
             <div class="three-col">
               <div class="form-group"><label>Discount Type</label><select class="input-field" id="offer-discount-type">
            <option value="percentage">Percentage (%)</option>
@@ -1860,6 +1863,57 @@ function pickPlan(el){
   picker.querySelectorAll('.plan-opt').forEach(p=>p.classList.remove('sel'));
   el.classList.add('sel');
 }
+   function setOfferImagePreview(url){
+  const wrap = document.getElementById('offer-image-preview-wrap');
+  const img = document.getElementById('offer-image-preview');
+
+  if(!wrap || !img) return;
+
+  if(url){
+    img.src = url;
+    wrap.style.display = 'block';
+  } else {
+    img.src = '';
+    wrap.style.display = 'none';
+  }
+}
+
+function previewOfferImage(event){
+  const file = event?.target?.files?.[0];
+  if(!file){
+    setOfferImagePreview('');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    setOfferImagePreview(e.target?.result || '');
+  };
+  reader.readAsDataURL(file);
+}
+
+async function uploadOfferImage(file){
+  if(!file) return null;
+
+  const fileExt = file.name.split('.').pop();
+  const fileName = `offer-${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+
+  const { error } = await supabaseClient.storage
+    .from('restaurant-images')
+    .upload(fileName, file);
+
+  if(error){
+    console.error('Image upload error:', error);
+    toast('Image upload failed', 'err');
+    return null;
+  }
+
+  const { data } = supabaseClient.storage
+    .from('restaurant-images')
+    .getPublicUrl(fileName);
+
+  return data?.publicUrl || null;
+}
 
 /* ─── LOGIN HANDLER ─── */
 async function doLogin(){
@@ -2437,6 +2491,7 @@ if(effectivelyInactive){
     `;
   }).join('');
 }
+   
    async function loadManagerBannedUsers(){
   const body = document.getElementById('manager-banned-users-body');
   if(!body) return;
@@ -2477,6 +2532,29 @@ if(effectivelyInactive){
       </td>
     </tr>
   `).join('');
+}
+   async function uploadOfferImage(file){
+  if(!file) return null;
+
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+
+  const { data, error } = await supabaseClient.storage
+    .from('offer-images')
+    .upload(fileName, file);
+
+  if(error){
+    console.error('Image upload error:', error);
+    toast('Image upload failed', 'err');
+    return null;
+  }
+
+  const { data: publicUrlData } = supabaseClient
+    .storage
+    .from('offer-images')
+    .getPublicUrl(fileName);
+
+  return publicUrlData.publicUrl;
 }
    async function managerBanUserByEmail(){
   const email = document.getElementById('manager-ban-email')?.value?.trim().toLowerCase();
@@ -3231,7 +3309,9 @@ async function initCustomer(){
   document.getElementById('offer-title').value = offer.title || '';
   document.getElementById('offer-short-desc').value = offer.short_desc || '';
   document.getElementById('offer-full-desc').value = offer.full_desc || '';
-  document.getElementById('offer-image-url').value = offer.image_url || '';
+  const fileInput = document.getElementById('offer-image-file');
+if(fileInput) fileInput.value = '';
+setOfferImagePreview(offer.image_url || '');
   document.getElementById('offer-discount-type').value = offer.discount_type || 'percentage';
   document.getElementById('offer-discount-value').value = offer.discount_value || '';
   document.getElementById('offer-original-price').value = offer.original_price || '';
@@ -3295,7 +3375,7 @@ async function initCustomer(){
 
   const restaurantId = restaurant.id;
 
-  const title = document.getElementById('offer-title')?.value?.trim() || '';
+    const title = document.getElementById('offer-title')?.value?.trim() || '';
   const shortDesc = document.getElementById('offer-short-desc')?.value?.trim() || '';
   const fullDesc = document.getElementById('offer-full-desc')?.value?.trim() || '';
   const discountType = document.getElementById('offer-discount-type')?.value || null;
@@ -3305,6 +3385,32 @@ async function initCustomer(){
   const validUntil = document.getElementById('offer-valid-until')?.value || null;
   const startTime = document.getElementById('offer-start-time')?.value || null;
   const endTime = document.getElementById('offer-end-time')?.value || null;
+
+  const fileInput = document.getElementById('offer-image-file');
+  const selectedFile = fileInput?.files?.[0] || null;
+
+  let imageUrl = null;
+
+  if(selectedFile){
+    imageUrl = await uploadOfferImage(selectedFile);
+    if(!imageUrl){
+      return;
+    }
+  } else if(currentEditingOfferId){
+    const { data: existingOfferImage, error: existingOfferImageError } = await supabaseClient
+      .from('offers')
+      .select('image_url')
+      .eq('id', currentEditingOfferId)
+      .single();
+
+    if(existingOfferImageError){
+      console.error('Could not load existing offer image:', existingOfferImageError);
+      toast('Could not preserve existing image', 'err');
+      return;
+    }
+
+    imageUrl = existingOfferImage?.image_url || null;
+  }
 
   const selectedCategoryChip = document.querySelector('#pane-r-add .chip-group .chip.on');
   const category = selectedCategoryChip
@@ -3327,9 +3433,10 @@ if(currentEditingOfferId){
   const updateRes = await supabaseClient
     .from('offers')
     .update({
-      title,
+            title,
       short_desc: shortDesc,
       full_desc: fullDesc,
+      image_url: imageUrl,
       discount_type: discountType,
       discount_value: discountValue,
       original_price: originalPrice,
@@ -3351,10 +3458,11 @@ if(currentEditingOfferId){
   const insertRes = await supabaseClient
     .from('offers')
     .insert([{
-      restaurant_id: restaurantId,
+            restaurant_id: restaurantId,
       title,
       short_desc: shortDesc,
       full_desc: fullDesc,
+      image_url: imageUrl,
       discount_type: discountType,
       discount_value: discountValue,
       original_price: originalPrice,
@@ -3410,7 +3518,9 @@ if(currentEditingOfferId){
   document.getElementById('offer-title').value = '';
   document.getElementById('offer-short-desc').value = '';
   document.getElementById('offer-full-desc').value = '';
-  document.getElementById('offer-image-url').value = '';
+  const resetFileInput = document.getElementById('offer-image-file');
+if(resetFileInput) resetFileInput.value = '';
+setOfferImagePreview('');
   document.getElementById('offer-discount-type').value = 'percentage';
   document.getElementById('offer-discount-value').value = '';
   document.getElementById('offer-original-price').value = '';
