@@ -1589,62 +1589,148 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
       </div>
       <!-- REVENUE -->
       <div class="pane" id="pane-m-revenue">
-        <div class="rdash-header"><h1>Revenue</h1><p>Subscription revenue and financial summary.</p></div>
-        <div class="stat-row">
-          <div class="stat-card"><div class="sc-label">MRR (Monthly Recurring)</div><div class="sc-val">$8,940</div><div class="sc-change up">↑ 11%</div></div>
-          <div class="stat-card"><div class="sc-label">ARR (Annual Recurring)</div><div class="sc-val">$107k</div><div class="sc-change up">↑ 18%</div></div>
-          <div class="stat-card"><div class="sc-label">Avg Revenue / User</div><div class="sc-val">$17.2</div><div class="sc-change up">↑ 3%</div></div>
-          <div class="stat-card"><div class="sc-label">Churn Rate</div><div class="sc-val">2.1%</div><div class="sc-change up">↓ 0.4%</div></div>
-        </div>
-        <div class="panel">
-          <div class="panel-head">Revenue Breakdown by Plan</div>
-          <table class="tbl" style="margin-top:8px">
-            <thead><tr><th>Plan</th><th>Active Subs</th><th>Price</th><th>Monthly Revenue</th></tr></thead>
-            <tbody>
-              <tr><td>Explorer ($9/mo)</td><td>1,840</td><td>$9</td><td style="color:var(--gold);font-weight:600">$16,560</td></tr>
-              <tr><td>Gourmet ($19/mo)</td><td>7,200</td><td>$19</td><td style="color:var(--gold);font-weight:600">$136,800</td></tr>
-              <tr><td>Annual Pro ($149/yr)</td><td>3,800</td><td>$12.4/mo equiv.</td><td style="color:var(--gold);font-weight:600">$47,120</td></tr>
-              <tr><td>Restaurant Starter ($29)</td><td>80</td><td>$29</td><td style="color:var(--gold);font-weight:600">$2,320</td></tr>
-              <tr><td>Restaurant Growth ($59)</td><td>103</td><td>$59</td><td style="color:var(--gold);font-weight:600">$6,077</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+  <div class="rdash-header">
+    <h1>Revenue</h1>
+    <p>Live subscription revenue based on current plan assignments.</p>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="sc-label">MRR (Monthly Recurring)</div>
+      <div class="sc-val" id="mgr-revenue-mrr">$0</div>
+      <div class="sc-change up">Live data</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-label">ARR (Annualized)</div>
+      <div class="sc-val" id="mgr-revenue-arr">$0</div>
+      <div class="sc-change up">Live data</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-label">Avg Revenue / Customer</div>
+      <div class="sc-val" id="mgr-revenue-arpu">$0</div>
+      <div class="sc-change up">Live data</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-label">Estimated Active Customers</div>
+      <div class="sc-val" id="mgr-revenue-customers">0</div>
+      <div class="sc-change up">Based on profiles</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">Revenue Breakdown by Plan</div>
+    <table class="tbl" style="margin-top:8px">
+      <thead>
+        <tr>
+          <th>Plan</th>
+          <th>Active Subs</th>
+          <th>Price</th>
+          <th>Monthly Revenue</th>
+        </tr>
+      </thead>
+      <tbody id="manager-revenue-body">
+        <tr>
+          <td colspan="4" style="text-align:center;color:var(--text-muted)">Loading revenue...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
       <!-- PLAN OVERVIEW -->
       <div class="pane" id="pane-m-plans">
-        <div class="rdash-header"><h1>Plan Overview</h1></div>
-        <div class="panel"><div class="panel-head">Member Plans</div>
-          <div style="display:flex;gap:20px;flex-wrap:wrap">
-            <div style="flex:1;min-width:180px;background:var(--surface2);border-radius:var(--r2);padding:20px;text-align:center;border:1px solid var(--border)"><div style="font-size:2rem;font-weight:700;font-family:'Cormorant Garamond',serif;color:var(--gold)">14.3%</div><div style="font-size:.8rem;color:var(--text-muted);margin-top:4px">Explorer</div><div style="font-size:.75rem;color:var(--text-dim)">1,840 members</div></div>
-            <div style="flex:1;min-width:180px;background:var(--surface2);border-radius:var(--r2);padding:20px;text-align:center;border:1px solid var(--border)"><div style="font-size:2rem;font-weight:700;font-family:'Cormorant Garamond',serif;color:var(--gold)">56.1%</div><div style="font-size:.8rem;color:var(--text-muted);margin-top:4px">Gourmet</div><div style="font-size:.75rem;color:var(--text-dim)">7,200 members</div></div>
-            <div style="flex:1;min-width:180px;background:var(--surface2);border-radius:var(--r2);padding:20px;text-align:center;border:1px solid var(--border)"><div style="font-size:2rem;font-weight:700;font-family:'Cormorant Garamond',serif;color:var(--gold)">29.6%</div><div style="font-size:.8rem;color:var(--text-muted);margin-top:4px">Annual Pro</div><div style="font-size:.75rem;color:var(--text-dim)">3,800 members</div></div>
-          </div>
-        </div>
+  <div class="rdash-header">
+    <h1>Plan Overview</h1>
+    <p>Live distribution of customer membership plans.</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">Member Plans</div>
+    <div id="manager-plan-cards" style="display:flex;gap:20px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px;background:var(--surface2);border-radius:var(--r2);padding:20px;text-align:center;border:1px solid var(--border);color:var(--text-muted)">
+        Loading plans...
       </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:18px">
+    <div class="panel-head">Plan Table</div>
+    <table class="tbl" style="margin-top:8px">
+      <thead>
+        <tr>
+          <th>Plan</th>
+          <th>Members</th>
+          <th>Share</th>
+        </tr>
+      </thead>
+      <tbody id="manager-plan-body">
+        <tr>
+          <td colspan="3" style="text-align:center;color:var(--text-muted)">Loading plans...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
       <!-- SETTINGS -->
       <div class="pane" id="pane-m-settings">
-        <div class="rdash-header"><h1>Platform Settings</h1></div>
-        <div style="display:grid;gap:18px">
-          <div class="panel">
-            <div class="panel-head">Coupon Security</div>
-            <div class="form-group"><label>Code Refresh Interval (minutes)</label><input class="input-field" type="number" value="5" style="max-width:120px"/></div>
-            <div class="form-group"><label>Max Redemptions per Deal per Day</label><input class="input-field" type="number" value="500" style="max-width:120px"/></div>
-            <div class="form-group"><label>Flag After N Failed Attempts</label><input class="input-field" type="number" value="3" style="max-width:120px"/></div>
-            <button class="btn-gold" onclick="toast('Settings saved!','ok')">Save</button>
-          </div>
-          <div class="panel">
-            <div class="panel-head">Notifications</div>
-            <div style="display:flex;flex-direction:column;gap:12px">
-              <label style="display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:.88rem;color:var(--text-soft)"><span>Email alert on new restaurant signup</span><label class="toggle"><input type="checkbox" checked/><span class="toggle-track"></span></label></label>
-              <label style="display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:.88rem;color:var(--text-soft)"><span>Alert on fraud flag</span><label class="toggle"><input type="checkbox" checked/><span class="toggle-track"></span></label></label>
-              <label style="display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:.88rem;color:var(--text-soft)"><span>Weekly revenue report email</span><label class="toggle"><input type="checkbox" checked/><span class="toggle-track"></span></label></label>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
+  <div class="rdash-header">
+    <h1>Platform Settings</h1>
+    <p>Manage core platform configuration.</p>
   </div>
-</div><!-- /page-manager -->
+
+  <div style="display:grid;gap:18px">
+    <div class="panel">
+      <div class="panel-head">Coupon Security</div>
+
+      <div class="form-group">
+        <label>Code Refresh Interval (minutes)</label>
+        <input class="input-field" id="setting-code-refresh" type="number" value="5" style="max-width:160px"/>
+      </div>
+
+      <div class="form-group">
+        <label>Max Redemptions per Deal per Day</label>
+        <input class="input-field" id="setting-max-redemptions" type="number" value="500" style="max-width:160px"/>
+      </div>
+
+      <div class="form-group">
+        <label>Flag After N Failed Attempts</label>
+        <input class="input-field" id="setting-flag-attempts" type="number" value="3" style="max-width:160px"/>
+      </div>
+
+      <button class="btn-gold" onclick="savePlatformSettings()">Save Settings</button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">Notifications</div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <label style="display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:.88rem;color:var(--text-soft)">
+          <span>Email alert on new restaurant signup</span>
+          <label class="toggle">
+            <input type="checkbox" id="setting-alert-new-restaurant"/>
+            <span class="toggle-track"></span>
+          </label>
+        </label>
+
+        <label style="display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:.88rem;color:var(--text-soft)">
+          <span>Alert on fraud flag</span>
+          <label class="toggle">
+            <input type="checkbox" id="setting-alert-fraud"/>
+            <span class="toggle-track"></span>
+          </label>
+        </label>
+
+        <label style="display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:.88rem;color:var(--text-soft)">
+          <span>Weekly revenue report email</span>
+          <label class="toggle">
+            <input type="checkbox" id="setting-weekly-report"/>
+            <span class="toggle-track"></span>
+          </label>
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+       <!-- /page-manager -->
 
 <!-- TOAST -->
 <div class="toast" id="toast"><span class="t-icon" id="t-icon"></span><span id="t-msg"></span></div>
@@ -2450,6 +2536,239 @@ if(effectivelyInactive){
   await loadManagerOffers();
   await loadManagerStats();
 }
+   async function loadManagerRevenue(){
+  const revenueBody = document.getElementById('manager-revenue-body');
+  const mrrEl = document.getElementById('mgr-revenue-mrr');
+  const arrEl = document.getElementById('mgr-revenue-arr');
+  const arpuEl = document.getElementById('mgr-revenue-arpu');
+  const customersEl = document.getElementById('mgr-revenue-customers');
+
+  if(!revenueBody) return;
+
+  revenueBody.innerHTML = `
+    <tr>
+      <td colspan="4" style="text-align:center;color:var(--text-muted)">Loading revenue...</td>
+    </tr>
+  `;
+
+  const { data: customers, error } = await supabaseClient
+    .from('profiles')
+    .select('id, role, plan_code')
+    .eq('role', 'customer');
+
+  if(error){
+    console.error('Revenue load error:', error);
+    revenueBody.innerHTML = `
+      <tr>
+        <td colspan="4" style="text-align:center;color:var(--red)">Could not load revenue</td>
+      </tr>
+    `;
+    return;
+  }
+
+  const planPrices = {
+    explorer: 9,
+    gourmet: 19,
+    annual_pro: 149 / 12,
+    free_trial: 0
+  };
+
+  const labelMap = {
+    explorer: 'Explorer',
+    gourmet: 'Gourmet',
+    annual_pro: 'Annual Pro',
+    free_trial: 'Free Trial'
+  };
+
+  const counts = {
+    explorer: 0,
+    gourmet: 0,
+    annual_pro: 0,
+    free_trial: 0
+  };
+
+  (customers || []).forEach(c => {
+    const plan = c.plan_code || 'free_trial';
+    if(counts[plan] === undefined) counts[plan] = 0;
+    counts[plan]++;
+  });
+
+  const rows = Object.keys(counts).map(plan => {
+    const count = counts[plan] || 0;
+    const price = planPrices[plan] || 0;
+    const monthlyRevenue = count * price;
+
+    return {
+      plan,
+      label: labelMap[plan] || plan,
+      count,
+      price,
+      monthlyRevenue
+    };
+  });
+
+  const totalCustomers = rows.reduce((sum, row) => sum + row.count, 0);
+  const totalMrr = rows.reduce((sum, row) => sum + row.monthlyRevenue, 0);
+  const totalArr = totalMrr * 12;
+  const arpu = totalCustomers ? totalMrr / totalCustomers : 0;
+
+  if(mrrEl) mrrEl.textContent = `$${totalMrr.toFixed(2)}`;
+  if(arrEl) arrEl.textContent = `$${totalArr.toFixed(2)}`;
+  if(arpuEl) arpuEl.textContent = `$${arpu.toFixed(2)}`;
+  if(customersEl) customersEl.textContent = String(totalCustomers);
+
+  revenueBody.innerHTML = rows.map(row => `
+    <tr>
+      <td>${row.label}</td>
+      <td>${row.count}</td>
+      <td>$${row.price.toFixed(2)}</td>
+      <td style="color:var(--gold);font-weight:600">$${row.monthlyRevenue.toFixed(2)}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadManagerPlans(){
+  const cardsWrap = document.getElementById('manager-plan-cards');
+  const body = document.getElementById('manager-plan-body');
+
+  if(!cardsWrap || !body) return;
+
+  cardsWrap.innerHTML = `
+    <div style="flex:1;min-width:180px;background:var(--surface2);border-radius:var(--r2);padding:20px;text-align:center;border:1px solid var(--border);color:var(--text-muted)">
+      Loading plans...
+    </div>
+  `;
+
+  body.innerHTML = `
+    <tr>
+      <td colspan="3" style="text-align:center;color:var(--text-muted)">Loading plans...</td>
+    </tr>
+  `;
+
+  const { data: customers, error } = await supabaseClient
+    .from('profiles')
+    .select('id, role, plan_code')
+    .eq('role', 'customer');
+
+  if(error){
+    console.error('Plan overview load error:', error);
+    body.innerHTML = `
+      <tr>
+        <td colspan="3" style="text-align:center;color:var(--red)">Could not load plans</td>
+      </tr>
+    `;
+    return;
+  }
+
+  const counts = {
+    explorer: 0,
+    gourmet: 0,
+    annual_pro: 0,
+    free_trial: 0
+  };
+
+  (customers || []).forEach(c => {
+    const plan = c.plan_code || 'free_trial';
+    if(counts[plan] === undefined) counts[plan] = 0;
+    counts[plan]++;
+  });
+
+  const total = Object.values(counts).reduce((sum, val) => sum + val, 0);
+
+  const plans = [
+    { key: 'explorer', label: 'Explorer' },
+    { key: 'gourmet', label: 'Gourmet' },
+    { key: 'annual_pro', label: 'Annual Pro' },
+    { key: 'free_trial', label: 'Free Trial' }
+  ];
+
+  cardsWrap.innerHTML = plans.map(plan => {
+    const count = counts[plan.key] || 0;
+    const pct = total ? ((count / total) * 100).toFixed(1) : '0.0';
+
+    return `
+      <div style="flex:1;min-width:180px;background:var(--surface2);border-radius:var(--r2);padding:20px;text-align:center;border:1px solid var(--border)">
+        <div style="font-size:2rem;font-weight:700;font-family:'Cormorant Garamond',serif;color:var(--gold)">${pct}%</div>
+        <div style="font-size:.8rem;color:var(--text-muted);margin-top:4px">${plan.label}</div>
+        <div style="font-size:.75rem;color:var(--text-dim)">${count} members</div>
+      </div>
+    `;
+  }).join('');
+
+  body.innerHTML = plans.map(plan => {
+    const count = counts[plan.key] || 0;
+    const pct = total ? ((count / total) * 100).toFixed(1) : '0.0';
+
+    return `
+      <tr>
+        <td>${plan.label}</td>
+        <td>${count}</td>
+        <td>${pct}%</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function loadPlatformSettings(){
+  const { data, error } = await supabaseClient
+    .from('platform_settings')
+    .select('*')
+    .eq('id', 1)
+    .maybeSingle();
+
+  if(error){
+    console.error('Error loading platform settings:', error);
+    return;
+  }
+
+  const settings = data || {
+    id: 1,
+    code_refresh_minutes: 5,
+    max_redemptions_per_day: 500,
+    flag_failed_attempts_at: 3,
+    alert_new_restaurant_signup: true,
+    alert_fraud_flag: true,
+    weekly_revenue_report: true
+  };
+
+  const codeRefreshEl = document.getElementById('setting-code-refresh');
+  const maxRedemptionsEl = document.getElementById('setting-max-redemptions');
+  const flagAttemptsEl = document.getElementById('setting-flag-attempts');
+  const alertNewRestaurantEl = document.getElementById('setting-alert-new-restaurant');
+  const alertFraudEl = document.getElementById('setting-alert-fraud');
+  const weeklyReportEl = document.getElementById('setting-weekly-report');
+
+  if(codeRefreshEl) codeRefreshEl.value = settings.code_refresh_minutes ?? 5;
+  if(maxRedemptionsEl) maxRedemptionsEl.value = settings.max_redemptions_per_day ?? 500;
+  if(flagAttemptsEl) flagAttemptsEl.value = settings.flag_failed_attempts_at ?? 3;
+  if(alertNewRestaurantEl) alertNewRestaurantEl.checked = !!settings.alert_new_restaurant_signup;
+  if(alertFraudEl) alertFraudEl.checked = !!settings.alert_fraud_flag;
+  if(weeklyReportEl) weeklyReportEl.checked = !!settings.weekly_revenue_report;
+}
+
+async function savePlatformSettings(){
+  const payload = {
+    id: 1,
+    code_refresh_minutes: parseInt(document.getElementById('setting-code-refresh')?.value || '5', 10),
+    max_redemptions_per_day: parseInt(document.getElementById('setting-max-redemptions')?.value || '500', 10),
+    flag_failed_attempts_at: parseInt(document.getElementById('setting-flag-attempts')?.value || '3', 10),
+    alert_new_restaurant_signup: !!document.getElementById('setting-alert-new-restaurant')?.checked,
+    alert_fraud_flag: !!document.getElementById('setting-alert-fraud')?.checked,
+    weekly_revenue_report: !!document.getElementById('setting-weekly-report')?.checked
+  };
+
+  const { error } = await supabaseClient
+    .from('platform_settings')
+    .upsert([payload]);
+
+  if(error){
+    console.error('Error saving platform settings:', error);
+    toast('Could not save settings', 'err');
+    return;
+  }
+
+  toast('Settings saved!', 'ok');
+}
 /* ─── MANAGER PANE SWITCHER ─── */
 async function paneM(id, linkEl){
   document.querySelectorAll('#page-manager .pane').forEach(p => p.classList.remove('on'));
@@ -2482,6 +2801,18 @@ async function paneM(id, linkEl){
 
   if(id === 'm-banned'){
     await loadManagerBannedUsers();
+  }
+
+  if(id === 'm-revenue'){
+    await loadManagerRevenue();
+  }
+
+  if(id === 'm-plans'){
+    await loadManagerPlans();
+  }
+
+  if(id === 'm-settings'){
+    await loadPlatformSettings();
   }
 }
 
@@ -3638,9 +3969,12 @@ async function initManager(){
   await loadManagerStats();
   await loadManagerUsers();
   await loadManagerRestaurants();
-   await loadManagerActivity();
-   await loadManagerOffers();
-   await loadManagerBannedUsers();
+  await loadManagerActivity();
+  await loadManagerOffers();
+  await loadManagerBannedUsers();
+  await loadManagerRevenue();
+  await loadManagerPlans();
+  await loadPlatformSettings();
 }
    async function loadManagerUsers(){
   const { data, error } = await supabaseClient
