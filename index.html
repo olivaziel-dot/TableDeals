@@ -3998,7 +3998,6 @@ function banUserRow(btn,name){
     toast('Reservation request sent! ✅', 'ok');
   await loadCustomerReservations();
 }
-}
   async function managerToggleUserBan(userId, shouldBan){
   const { error } = await supabaseClient
     .from('profiles')
