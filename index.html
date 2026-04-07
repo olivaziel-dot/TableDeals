@@ -5018,7 +5018,9 @@ function banUserRow(btn,name){
   listWrap.innerHTML = data.map(r => `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
       <div>
-        <div style="font-size:.95rem;font-weight:600;color:var(--text);margin-bottom:3px">Reservation for ${r.party_size}</div>
+        <div style="font-size:.95rem;font-weight:600;color:var(--text);margin-bottom:3px">
+          Reservation for ${r.party_size}
+        </div>
         <div style="font-size:.8rem;color:var(--text-muted)">
           📅 ${r.reserved_date} · ${r.reserved_time}${r.note ? ' · ' + r.note : ''}
         </div>
@@ -5039,20 +5041,24 @@ function banUserRow(btn,name){
   `).join('');
 }
 
-/* ─── TOAST ─── */
-function toast(msg,type='ok'){
-  const t=document.getElementById('toast');
-  const ic=document.getElementById('t-icon');
-  const ms=document.getElementById('t-msg');
-  t.className='toast '+(type==='ok'?'success':'error');
-  ic.textContent=type==='ok'?'✅':'❌';
-  ms.textContent=msg;
+function toast(msg, type = 'ok'){
+  const t = document.getElementById('toast');
+  const ic = document.getElementById('t-icon');
+  const ms = document.getElementById('t-msg');
+
+  if(!t || !ic || !ms) return;
+
+  t.className = 'toast ' + (type === 'ok' ? 'success' : 'error');
+  ic.textContent = type === 'ok' ? '✅' : '❌';
+  ms.textContent = msg;
   t.classList.add('show');
+
   clearTimeout(t._t);
-  t._t=setTimeout(()=>t.classList.remove('show'),3000);
+  t._t = setTimeout(() => {
+    t.classList.remove('show');
+  }, 3000);
 }
 
-/* ─── KEYBOARD ─── */
 document.addEventListener('keydown', e => {
   if(e.key !== 'Escape') return;
 
@@ -5062,7 +5068,6 @@ document.addEventListener('keydown', e => {
   closeRestaurantProfileModal();
 });
 
-/* ─── BOOT ─── */
 window.addEventListener('DOMContentLoaded', async () => {
   try {
     if(typeof buildHours === 'function'){
