@@ -623,7 +623,7 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
    TOAST
 ══════════════════════════════════════════════ */
 .toast{
-  position:fixed;bottom:24px;right:24px;
+  position:fixed;bottom:24px;left:24px;
   background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r2);
   padding:13px 18px;display:flex;align-items:center;gap:11px;
   font-size:.86rem;color:var(--text-soft);
@@ -1114,8 +1114,7 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
         </div>
       </div>
 
-      <p class="modal-desc" id="deal-restaurant-profile-description">Description</p>
-
+<p class="modal-desc" id="deal-restaurant-profile-description">Description</p>
       <div class="modal-tc">
         <h4>Contact & Details</h4>
         <ul id="restaurant-profile-details-list"></ul>
@@ -1188,7 +1187,7 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
   </div>
   <button class="btn-outline" style="width:100%" onclick="bookReservation()">Reserve Table</button>
 </div>
-      <button class="btn-gold" style="width:100%;padding:13px">📍 Get Directions</button>
+<button class="btn-gold" style="width:100%;padding:13px" onclick="openDirections()">📍 Get Directions</button> 
     </div>
   </div>
 </div>
@@ -4117,7 +4116,7 @@ if(codeEl) codeEl.textContent = '—';
 
 startCouponTimer(d.dealKey);
 }
-   async function openRestaurantProfileFromDeal(){
+  async function openRestaurantProfileFromDeal(){
   if(!_modalDeal){
     toast('No restaurant selected', 'err');
     return;
@@ -4127,10 +4126,10 @@ startCouponTimer(d.dealKey);
   const coverImg = document.getElementById('restaurant-profile-cover-img');
   const logoImg = document.getElementById('restaurant-profile-logo-img');
 
- document.getElementById('deal-restaurant-profile-name').textContent = _modalDeal.restaurant || 'Restaurant';
-document.getElementById('deal-restaurant-profile-cuisine').textContent = _modalDeal.restaurant_cuisine || 'Restaurant';
-document.getElementById('deal-restaurant-profile-location').textContent = _modalDeal.restaurant_location || 'Location not set';
-document.getElementById('deal-restaurant-profile-description').textContent = _modalDeal.restaurant_description || 'No description yet';
+  document.getElementById('deal-restaurant-profile-name').textContent = _modalDeal.restaurant || 'Restaurant';
+  document.getElementById('deal-restaurant-profile-cuisine').textContent = _modalDeal.restaurant_cuisine || 'Restaurant';
+  document.getElementById('deal-restaurant-profile-location').textContent = _modalDeal.restaurant_location || 'Location not set';
+  document.getElementById('deal-restaurant-profile-description').textContent = _modalDeal.restaurant_description || 'No description yet';
 
   if(_modalDeal.restaurant_cover_image){
     coverImg.src = _modalDeal.restaurant_cover_image;
@@ -4149,10 +4148,10 @@ document.getElementById('deal-restaurant-profile-description').textContent = _mo
   }
 
   const details = [];
-if(_modalDeal.restaurant_phone) details.push(`<li>Phone: ${_modalDeal.restaurant_phone}</li>`);
-if(_modalDeal.restaurant_website) details.push(`<li>Website: ${_modalDeal.restaurant_website}</li>`);
-if(_modalDeal.restaurant_instagram) details.push(`<li>Instagram: ${_modalDeal.restaurant_instagram}</li>`);
-if(_modalDeal.restaurant_avg_price) details.push(`<li>Avg. Price Level: ${priceTierLabel(_modalDeal.restaurant_avg_price)}</li>`);
+  if(_modalDeal.restaurant_phone) details.push(`<li>Phone: ${_modalDeal.restaurant_phone}</li>`);
+  if(_modalDeal.restaurant_website) details.push(`<li>Website: ${_modalDeal.restaurant_website}</li>`);
+  if(_modalDeal.restaurant_instagram) details.push(`<li>Instagram: ${_modalDeal.restaurant_instagram}</li>`);
+  if(_modalDeal.restaurant_avg_price) details.push(`<li>Avg. Price Level: ${priceTierLabel(_modalDeal.restaurant_avg_price)}</li>`);
 
   document.getElementById('restaurant-profile-details-list').innerHTML =
     details.length ? details.join('') : '<li>No extra details yet</li>';
@@ -4192,7 +4191,22 @@ if(_modalDeal.restaurant_avg_price) details.push(`<li>Avg. Price Level: ${priceT
 
   document.getElementById('restaurant-profile-overlay').classList.add('open');
 }
+   function openDirections(){
+  if(!_modalDeal){
+    toast('No restaurant selected', 'err');
+    return;
+  }
 
+  const destination = (_modalDeal.restaurant_location || '').trim();
+
+  if(!destination){
+    toast('No address available for this restaurant', 'err');
+    return;
+  }
+
+  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`;
+  window.open(url, '_blank');
+}
 function closeRestaurantProfileModal(){
   const overlay = document.getElementById('restaurant-profile-overlay');
   if(overlay) overlay.classList.remove('open');
@@ -5192,16 +5206,29 @@ function banUserRow(btn,name){
   `).join('');
 }
 
-function toast(msg, type = 'ok'){
-  const t = document.getElementById('toast');
-  const ic = document.getElementById('t-icon');
-  const ms = document.getElementById('t-msg');
+function toast(msg, type='ok'){
+  let t = document.getElementById('global-toast');
 
-  if(!t || !ic || !ms) return;
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'global-toast';
+    t.className = 'toast';
+    t.innerHTML = `
+      <span class="t-icon"></span>
+      <span class="t-msg"></span>
+    `;
+    document.body.appendChild(t);
+  }
+
+  const ic = t.querySelector('.t-icon');
+  const ms = t.querySelector('.t-msg');
 
   t.className = 'toast ' + (type === 'ok' ? 'success' : 'error');
   ic.textContent = type === 'ok' ? '✅' : '❌';
   ms.textContent = msg;
+
+  t.classList.remove('show');
+  void t.offsetWidth;
   t.classList.add('show');
 
   clearTimeout(t._t);
