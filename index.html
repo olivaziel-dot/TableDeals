@@ -1111,6 +1111,7 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
          <div class="modal-rest-tag" id="deal-restaurant-profile-cuisine">Restaurant</div>
 <h2 class="modal-title" id="deal-restaurant-profile-name" style="margin-bottom:4px">Restaurant Name</h2>
 <p class="modal-desc" id="deal-restaurant-profile-location" style="margin-bottom:0">Location</p>
+           <p class="modal-desc" id="deal-restaurant-profile-description">Description</p>
         </div>
       </div>
 
@@ -4178,29 +4179,44 @@ startCouponTimer(d.dealKey);
   } else {
     const orderedDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
     const byDay = {};
-    hours.forEach(row => byDay[row.day] = row);
+    hours.forEach(row => {
+      byDay[String(row.day).trim()] = row;
+    });
 
     hoursList.innerHTML = orderedDays.map(day => {
       const row = byDay[day];
       if(!row || !row.is_open){
         return `<li>${day}: Closed</li>`;
       }
-      return `<li>${day}: ${String(row.open_time).slice(0,5)} - ${String(row.close_time).slice(0,5)}</li>`;
+
+      const openTime = String(row.open_time || '').slice(0,5);
+      const closeTime = String(row.close_time || '').slice(0,5);
+
+      return `<li>${day}: ${openTime} - ${closeTime}</li>`;
     }).join('');
   }
 
   document.getElementById('restaurant-profile-overlay').classList.add('open');
 }
-   function openDirections(){
+  function openDirections(){
   if(!_modalDeal){
     toast('No restaurant selected', 'err');
     return;
   }
 
-  const destination = (_modalDeal.restaurant_location || '').trim();
+  const destination = String(_modalDeal.restaurant_location || '').trim();
 
   if(!destination){
     toast('No address available for this restaurant', 'err');
+    return;
+  }
+
+  const looksTooVague =
+    destination.length < 8 ||
+    !/[0-9]/.test(destination) && !destination.includes(',') && destination.split(' ').length < 3;
+
+  if(looksTooVague){
+    toast('Address is too vague. Please save a full address first.', 'err');
     return;
   }
 
