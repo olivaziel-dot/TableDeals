@@ -2,6 +2,32 @@
 <html lang="en">
 <head>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+   <script>
+  let googlePlacesReady = false;
+
+  function initGooglePlacesAutocomplete(){
+    if(!window.google?.maps?.places) return;
+
+    const input = document.getElementById('restaurant-profile-location');
+    if(!input) return;
+
+    const autocomplete = new google.maps.places.Autocomplete(input, {
+      types: ['address'],
+      componentRestrictions: { country: 'lb' },
+      fields: ['formatted_address', 'geometry', 'name']
+    });
+
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if(place?.formatted_address){
+        input.value = place.formatted_address;
+      }
+    });
+
+    googlePlacesReady = true;
+  }
+</script>
+<script async src="https://maps.googleapis.com/maps/api/js?key=DEIN_GOOGLE_API_KEY&libraries=places&callback=initGooglePlacesAutocomplete"></script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>TableDeal Lebanon – Exclusive Restaurant Offers</title>
@@ -366,6 +392,51 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
   white-space:nowrap;cursor:pointer;transition:all .2s;flex-shrink:0;color:var(--text-soft);
 }
 .f-chip:hover,.f-chip.on{background:rgba(212,168,67,.15);border-color:var(--gold);color:var(--gold)}
+   .price-tier-picker{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+  margin-top:8px;
+}
+.price-tier-btn{
+  background:var(--surface2);
+  border:1px solid var(--border2);
+  border-radius:12px;
+  padding:12px;
+  text-align:left;
+  transition:all .2s;
+  color:var(--text-soft);
+}
+.price-tier-btn:hover{
+  border-color:rgba(212,168,67,.45);
+}
+.price-tier-btn.on{
+  border-color:var(--gold);
+  background:rgba(212,168,67,.08);
+}
+.price-tier-symbols{
+  font-size:1.2rem;
+  line-height:1;
+  letter-spacing:.04em;
+}
+.price-tier-symbols strong{
+  color:var(--gold);
+  font-weight:700;
+}
+.price-tier-symbols span{
+  color:var(--text-dim);
+}
+.price-tier-note{
+  margin-top:8px;
+  font-size:.76rem;
+  color:var(--text-muted);
+}
+@media(max-width:768px){
+  .price-tier-picker{grid-template-columns:1fr 1fr}
+}
+@media(max-width:480px){
+  .price-tier-picker{grid-template-columns:1fr}
+}
 
 /* deals grid */
 .deals-wrap{padding:0 36px 56px;max-width:1280px;margin:0 auto}
@@ -1062,13 +1133,13 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
         <img id="restaurant-profile-logo-img" src="" alt="Restaurant logo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:1px solid var(--border);display:none"/>
         <div>
-          <div class="modal-rest-tag" id="restaurant-profile-cuisine">Restaurant</div>
-          <h2 class="modal-title" id="restaurant-profile-name" style="margin-bottom:4px">Restaurant Name</h2>
-          <p class="modal-desc" id="restaurant-profile-location" style="margin-bottom:0">Location</p>
+         <div class="modal-rest-tag" id="deal-restaurant-profile-cuisine">Restaurant</div>
+<h2 class="modal-title" id="deal-restaurant-profile-name" style="margin-bottom:4px">Restaurant Name</h2>
+<p class="modal-desc" id="deal-restaurant-profile-location" style="margin-bottom:0">Location</p>
         </div>
       </div>
 
-      <p class="modal-desc" id="restaurant-profile-description">Description</p>
+      <p class="modal-desc" id="deal-restaurant-profile-description">Description</p>
 
       <div class="modal-tc">
         <h4>Contact & Details</h4>
@@ -1400,71 +1471,120 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
       </div>
     </div>
 
-    <div class="panel">
-      <div class="panel-head">Basic Information</div>
+<div class="panel">
+  <div class="panel-head">Basic Information</div>
 
-      <div class="two-col">
-        <div class="form-group"><label>Restaurant Name</label><input class="input-field" id="restaurant-profile-name"/></div>
-        <div class="form-group">
-          <label>Cuisine Type</label>
-          <select class="input-field" id="restaurant-profile-cuisine">
-            <option>Lebanese / Middle Eastern</option>
-            <option>American / Burgers</option>
-            <option>Italian / Pizza</option>
-            <option>Japanese / Sushi</option>
-            <option>Mediterranean</option>
-            <option>French</option>
-            <option>Indian</option>
-            <option>Mexican</option>
-            <option>Asian Fusion</option>
-            <option>Other</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>Short Description</label>
-        <textarea class="input-field" id="restaurant-profile-description" rows="2" style="resize:vertical"></textarea>
-      </div>
-
-      <div class="form-group">
-        <label>Address</label>
-        <input class="input-field" id="restaurant-profile-location"/>
-      </div>
-
-      <div class="two-col">
-        <div class="form-group"><label>Phone</label><input class="input-field" id="restaurant-profile-phone"/></div>
-        <div class="form-group"><label>WhatsApp</label><input class="input-field" id="restaurant-profile-whatsapp"/></div>
-      </div>
-
-      <div class="two-col">
-        <div class="form-group"><label>Website</label><input class="input-field" id="restaurant-profile-website" placeholder="https://yourrestaurant.com"/></div>
-        <div class="form-group"><label>Instagram</label><input class="input-field" id="restaurant-profile-instagram" placeholder="@yourrestaurant"/></div>
-      </div>
-
-      <div class="form-group">
-        <label>Avg. Price per Person ($)</label>
-        <input class="input-field" id="restaurant-profile-avg-price" type="number"/>
-      </div>
-
-      <div class="form-group">
-        <label>Tags</label>
-        <div class="chip-group" id="restaurant-profile-tags">
-          <label class="chip" onclick="this.classList.toggle('on')">Dine-in</label>
-          <label class="chip" onclick="this.classList.toggle('on')">Takeaway</label>
-          <label class="chip" onclick="this.classList.toggle('on')">Delivery</label>
-          <label class="chip" onclick="this.classList.toggle('on')">Outdoor Seating</label>
-          <label class="chip" onclick="this.classList.toggle('on')">Rooftop</label>
-          <label class="chip" onclick="this.classList.toggle('on')">Live Music</label>
-          <label class="chip" onclick="this.classList.toggle('on')">Parking</label>
-          <label class="chip" onclick="this.classList.toggle('on')">WiFi</label>
-        </div>
-      </div>
-
-      <div style="display:flex;justify-content:flex-end">
-        <button class="btn-gold" onclick="saveRestaurantProfile()">Save Profile</button>
-      </div>
+  <div class="two-col">
+    <div class="form-group">
+      <label>Restaurant Name</label>
+      <input class="input-field" id="restaurant-profile-name" maxlength="80"/>
     </div>
+    <div class="form-group">
+      <label>Cuisine Type</label>
+      <select class="input-field" id="restaurant-profile-cuisine">
+        <option>Lebanese / Middle Eastern</option>
+        <option>American / Burgers</option>
+        <option>Italian / Pizza</option>
+        <option>Japanese / Sushi</option>
+        <option>Mediterranean</option>
+        <option>French</option>
+        <option>Indian</option>
+        <option>Mexican</option>
+        <option>Asian Fusion</option>
+        <option>Other</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>Short Description</label>
+    <textarea
+      class="input-field"
+      id="restaurant-profile-description"
+      rows="2"
+      maxlength="60"
+      oninput="updateRestaurantDescriptionCounter()"
+      style="resize:vertical"
+      placeholder="Max. 60 characters"
+    ></textarea>
+    <div id="restaurant-profile-description-counter" style="margin-top:6px;font-size:.78rem;color:var(--text-muted);text-align:right">0 / 60</div>
+  </div>
+
+  <div class="form-group">
+    <label>Address</label>
+    <input
+      class="input-field"
+      id="restaurant-profile-location"
+      placeholder="Start typing your address…"
+      autocomplete="street-address"
+    />
+  </div>
+
+  <div class="two-col">
+    <div class="form-group">
+      <label>Phone</label>
+      <input class="input-field" id="restaurant-profile-phone"/>
+    </div>
+    <div class="form-group">
+      <label>Website</label>
+      <input class="input-field" id="restaurant-profile-website" placeholder="https://yourrestaurant.com"/>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>Instagram</label>
+    <input class="input-field" id="restaurant-profile-instagram" placeholder="@yourrestaurant"/>
+  </div>
+
+  <div class="form-group">
+    <label style="display:flex;align-items:center;gap:8px">
+      Avg. Price Level
+      <span title="Choose the typical spend per person: $ = 0–9, $$ = 10–99, $$$ = 100–999, $$$$ = 1000+" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--border2);font-size:.72rem;color:var(--text-muted);cursor:help">i</span>
+    </label>
+
+    <input type="hidden" id="restaurant-profile-avg-price" value="1"/>
+
+    <div class="price-tier-picker">
+      <button type="button" class="price-tier-btn on" data-tier="1" onclick="selectPriceTier(1)">
+        <div class="price-tier-symbols"><strong>$</strong><span>$$$</span></div>
+        <div class="price-tier-note">$0–9</div>
+      </button>
+
+      <button type="button" class="price-tier-btn" data-tier="2" onclick="selectPriceTier(2)">
+        <div class="price-tier-symbols"><strong>$$</strong><span>$$</span></div>
+        <div class="price-tier-note">$10–99</div>
+      </button>
+
+      <button type="button" class="price-tier-btn" data-tier="3" onclick="selectPriceTier(3)">
+        <div class="price-tier-symbols"><strong>$$$</strong><span>$</span></div>
+        <div class="price-tier-note">$100–999</div>
+      </button>
+
+      <button type="button" class="price-tier-btn" data-tier="4" onclick="selectPriceTier(4)">
+        <div class="price-tier-symbols"><strong>$$$$</strong><span></span></div>
+        <div class="price-tier-note">$1000+</div>
+      </button>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>Tags</label>
+    <div class="chip-group" id="restaurant-profile-tags">
+      <label class="chip" onclick="this.classList.toggle('on')">Dine-in</label>
+      <label class="chip" onclick="this.classList.toggle('on')">Takeaway</label>
+      <label class="chip" onclick="this.classList.toggle('on')">Delivery</label>
+      <label class="chip" onclick="this.classList.toggle('on')">Outdoor Seating</label>
+      <label class="chip" onclick="this.classList.toggle('on')">Rooftop</label>
+      <label class="chip" onclick="this.classList.toggle('on')">Live Music</label>
+      <label class="chip" onclick="this.classList.toggle('on')">Parking</label>
+      <label class="chip" onclick="this.classList.toggle('on')">WiFi</label>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:flex-end">
+    <button class="btn-gold" onclick="saveRestaurantProfile()">Save Profile</button>
+  </div>
+</div>
   </div>
 </div>
       <!-- BILLING -->
@@ -2362,6 +2482,45 @@ async function doRegister(type){
 } else {
   await go('customer');
 }
+}
+   function updateRestaurantDescriptionCounter(){
+  const el = document.getElementById('restaurant-profile-description');
+  const counter = document.getElementById('restaurant-profile-description-counter');
+  if(!el || !counter) return;
+
+  if(el.value.length > 60){
+    el.value = el.value.slice(0, 60);
+  }
+
+  counter.textContent = `${el.value.length} / 60`;
+}
+
+function normalizePriceTier(value){
+  const num = Number(value);
+
+  if(!value || Number.isNaN(num)) return 1;
+  if(num <= 4) return num;      // already saved as tier
+  if(num <= 9) return 1;
+  if(num <= 99) return 2;
+  if(num <= 999) return 3;
+  return 4;
+}
+
+function priceTierLabel(value){
+  const tier = normalizePriceTier(value);
+  if(tier === 1) return '$';
+  if(tier === 2) return '$$';
+  if(tier === 3) return '$$$';
+  return '$$$$';
+}
+
+function selectPriceTier(tier){
+  const hidden = document.getElementById('restaurant-profile-avg-price');
+  if(hidden) hidden.value = String(tier);
+
+  document.querySelectorAll('.price-tier-btn').forEach(btn => {
+    btn.classList.toggle('on', Number(btn.dataset.tier) === Number(tier));
+  });
 }
   async function handleInitialSession(){
   try {
@@ -4000,10 +4159,10 @@ startCouponTimer(d.dealKey);
   const coverImg = document.getElementById('restaurant-profile-cover-img');
   const logoImg = document.getElementById('restaurant-profile-logo-img');
 
-  document.getElementById('restaurant-profile-name').textContent = _modalDeal.restaurant || 'Restaurant';
-  document.getElementById('restaurant-profile-cuisine').textContent = _modalDeal.restaurant_cuisine || 'Restaurant';
-  document.getElementById('restaurant-profile-location').textContent = _modalDeal.restaurant_location || 'Location not set';
-  document.getElementById('restaurant-profile-description').textContent = _modalDeal.restaurant_description || 'No description yet';
+ document.getElementById('deal-restaurant-profile-name').textContent = _modalDeal.restaurant || 'Restaurant';
+document.getElementById('deal-restaurant-profile-cuisine').textContent = _modalDeal.restaurant_cuisine || 'Restaurant';
+document.getElementById('deal-restaurant-profile-location').textContent = _modalDeal.restaurant_location || 'Location not set';
+document.getElementById('deal-restaurant-profile-description').textContent = _modalDeal.restaurant_description || 'No description yet';
 
   if(_modalDeal.restaurant_cover_image){
     coverImg.src = _modalDeal.restaurant_cover_image;
@@ -4022,11 +4181,10 @@ startCouponTimer(d.dealKey);
   }
 
   const details = [];
-  if(_modalDeal.restaurant_phone) details.push(`<li>Phone: ${_modalDeal.restaurant_phone}</li>`);
-  if(_modalDeal.restaurant_whatsapp) details.push(`<li>WhatsApp: ${_modalDeal.restaurant_whatsapp}</li>`);
-  if(_modalDeal.restaurant_website) details.push(`<li>Website: ${_modalDeal.restaurant_website}</li>`);
-  if(_modalDeal.restaurant_instagram) details.push(`<li>Instagram: ${_modalDeal.restaurant_instagram}</li>`);
-  if(_modalDeal.restaurant_avg_price) details.push(`<li>Avg. Price: $${_modalDeal.restaurant_avg_price}</li>`);
+if(_modalDeal.restaurant_phone) details.push(`<li>Phone: ${_modalDeal.restaurant_phone}</li>`);
+if(_modalDeal.restaurant_website) details.push(`<li>Website: ${_modalDeal.restaurant_website}</li>`);
+if(_modalDeal.restaurant_instagram) details.push(`<li>Instagram: ${_modalDeal.restaurant_instagram}</li>`);
+if(_modalDeal.restaurant_avg_price) details.push(`<li>Avg. Price Level: ${priceTierLabel(_modalDeal.restaurant_avg_price)}</li>`);
 
   document.getElementById('restaurant-profile-details-list').innerHTML =
     details.length ? details.join('') : '<li>No extra details yet</li>';
@@ -4226,7 +4384,6 @@ async function loadRestaurantProfile(){
   const descriptionEl = document.getElementById('restaurant-profile-description');
   const locationEl = document.getElementById('restaurant-profile-location');
   const phoneEl = document.getElementById('restaurant-profile-phone');
-  const whatsappEl = document.getElementById('restaurant-profile-whatsapp');
   const websiteEl = document.getElementById('restaurant-profile-website');
   const instagramEl = document.getElementById('restaurant-profile-instagram');
   const avgPriceEl = document.getElementById('restaurant-profile-avg-price');
@@ -4236,10 +4393,13 @@ async function loadRestaurantProfile(){
   if(descriptionEl) descriptionEl.value = restaurant.short_description || '';
   if(locationEl) locationEl.value = restaurant.location || '';
   if(phoneEl) phoneEl.value = restaurant.phone || '';
-  if(whatsappEl) whatsappEl.value = restaurant.whatsapp || '';
   if(websiteEl) websiteEl.value = restaurant.website || '';
   if(instagramEl) instagramEl.value = restaurant.instagram || '';
-  if(avgPriceEl) avgPriceEl.value = restaurant.avg_price || '';
+
+  const tier = normalizePriceTier(restaurant.avg_price);
+  if(avgPriceEl) avgPriceEl.value = String(tier);
+  selectPriceTier(tier);
+  updateRestaurantDescriptionCounter();
 
   const tagWrap = document.getElementById('restaurant-profile-tags');
   if(tagWrap){
@@ -4254,8 +4414,12 @@ async function loadRestaurantProfile(){
   if(coverInput) coverInput.value = '';
   if(logoInput) logoInput.value = '';
 
-  setRestaurantCoverPreview(restaurant.cover_image_url || '');
+    setRestaurantCoverPreview(restaurant.cover_image_url || '');
   setRestaurantLogoPreview(restaurant.logo_image_url || '');
+
+  if(!googlePlacesReady && window.google?.maps?.places){
+    initGooglePlacesAutocomplete();
+  }
 }
 
 async function saveRestaurantProfile(){
@@ -4286,16 +4450,19 @@ async function saveRestaurantProfile(){
   const tags = [...document.querySelectorAll('#restaurant-profile-tags .chip.on')]
     .map(chip => chip.textContent.trim());
 
+  const shortDescription = (document.getElementById('restaurant-profile-description')?.value || '')
+    .trim()
+    .slice(0, 60);
+
   const payload = {
     name: document.getElementById('restaurant-profile-name')?.value?.trim() || '',
     cuisine_type: document.getElementById('restaurant-profile-cuisine')?.value || null,
-    short_description: document.getElementById('restaurant-profile-description')?.value?.trim() || '',
+    short_description: shortDescription,
     location: document.getElementById('restaurant-profile-location')?.value?.trim() || '',
     phone: document.getElementById('restaurant-profile-phone')?.value?.trim() || '',
-    whatsapp: document.getElementById('restaurant-profile-whatsapp')?.value?.trim() || '',
     website: document.getElementById('restaurant-profile-website')?.value?.trim() || '',
     instagram: document.getElementById('restaurant-profile-instagram')?.value?.trim() || '',
-    avg_price: document.getElementById('restaurant-profile-avg-price')?.value || null,
+    avg_price: Number(document.getElementById('restaurant-profile-avg-price')?.value || 1),
     tags,
     cover_image_url: coverImageUrl,
     logo_image_url: logoImageUrl
