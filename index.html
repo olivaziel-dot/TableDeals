@@ -4210,16 +4210,6 @@ hoursList.innerHTML = orderedDays.map(day => {
 
   return `<li>${day}: ${openTime} - ${closeTime}</li>`;
 }).join('');
-
-      if(!row || !row.is_open){
-        return `<li>${day}: Closed</li>`;
-      }
-
-      const openTime = String(row.open_time || '').slice(0,5);
-      const closeTime = String(row.close_time || '').slice(0,5);
-
-      return `<li>${day}: ${openTime} - ${closeTime}</li>`;
-    }).join('');
   }
 
   document.getElementById('restaurant-profile-overlay').classList.add('open');
