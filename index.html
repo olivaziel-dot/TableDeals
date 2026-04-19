@@ -1488,11 +1488,11 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
   <div class="form-group">
     <label>Address</label>
     <input
-      class="input-field"
-      id="restaurant-profile-location"
-      placeholder="Start typing your address…"
-      autocomplete="street-address"
-    />
+  class="input-field"
+  id="restaurant-profile-location"
+  placeholder="e.g. Hamra Main Street, Beirut, Lebanon"
+  autocomplete="street-address"
+/>
   </div>
 
   <div class="two-col">
@@ -4117,7 +4117,7 @@ if(codeEl) codeEl.textContent = '—';
 
 startCouponTimer(d.dealKey);
 }
-  async function openRestaurantProfileFromDeal(){
+ async function openRestaurantProfileFromDeal(){
   if(!_modalDeal){
     toast('No restaurant selected', 'err');
     return;
@@ -4150,6 +4150,7 @@ startCouponTimer(d.dealKey);
 
   const details = [];
   if(_modalDeal.restaurant_phone) details.push(`<li>Phone: ${_modalDeal.restaurant_phone}</li>`);
+  if(_modalDeal.restaurant_location) details.push(`<li>Location: ${_modalDeal.restaurant_location}</li>`);
   if(_modalDeal.restaurant_website) details.push(`<li>Website: ${_modalDeal.restaurant_website}</li>`);
   if(_modalDeal.restaurant_instagram) details.push(`<li>Instagram: ${_modalDeal.restaurant_instagram}</li>`);
   if(_modalDeal.restaurant_avg_price) details.push(`<li>Avg. Price Level: ${priceTierLabel(_modalDeal.restaurant_avg_price)}</li>`);
@@ -4179,12 +4180,15 @@ startCouponTimer(d.dealKey);
   } else {
     const orderedDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
     const byDay = {};
+
     hours.forEach(row => {
-      byDay[String(row.day).trim()] = row;
+      const key = String(row.day || '').trim().toLowerCase();
+      byDay[key] = row;
     });
 
     hoursList.innerHTML = orderedDays.map(day => {
-      const row = byDay[day];
+      const row = byDay[day.toLowerCase()];
+
       if(!row || !row.is_open){
         return `<li>${day}: Closed</li>`;
       }
@@ -4208,15 +4212,6 @@ startCouponTimer(d.dealKey);
 
   if(!destination){
     toast('No address available for this restaurant', 'err');
-    return;
-  }
-
-  const looksTooVague =
-    destination.length < 8 ||
-    !/[0-9]/.test(destination) && !destination.includes(',') && destination.split(' ').length < 3;
-
-  if(looksTooVague){
-    toast('Address is too vague. Please save a full address first.', 'err');
     return;
   }
 
