@@ -3332,6 +3332,7 @@ function buildHours(){
     const open = i < 6;
     const row = document.createElement('div');
     row.className = 'hrs-row';
+    row.dataset.day = day;
     row.innerHTML = `
       <span class="hrs-day">${day}</span>
       <label class="toggle">
@@ -4179,15 +4180,36 @@ startCouponTimer(d.dealKey);
     hoursList.innerHTML = '<li>No opening hours set</li>';
   } else {
     const orderedDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-    const byDay = {};
+const aliases = {
+  monday: ['monday','mon'],
+  tuesday: ['tuesday','tue','tues'],
+  wednesday: ['wednesday','wed'],
+  thursday: ['thursday','thu','thur','thurs'],
+  friday: ['friday','fri'],
+  saturday: ['saturday','sat'],
+  sunday: ['sunday','sun']
+};
 
-    hours.forEach(row => {
-      const key = String(row.day || '').trim().toLowerCase();
-      byDay[key] = row;
-    });
+const byDay = {};
+hours.forEach(row => {
+  const raw = String(row.day || '').trim().toLowerCase();
+  byDay[raw] = row;
+});
 
-    hoursList.innerHTML = orderedDays.map(day => {
-      const row = byDay[day.toLowerCase()];
+hoursList.innerHTML = orderedDays.map(day => {
+  const key = day.toLowerCase();
+  const possibleKeys = aliases[key] || [key];
+  const row = possibleKeys.map(k => byDay[k]).find(Boolean);
+
+  if(!row || !row.is_open){
+    return `<li>${day}: Closed</li>`;
+  }
+
+  const openTime = String(row.open_time || '').slice(0,5);
+  const closeTime = String(row.close_time || '').slice(0,5);
+
+  return `<li>${day}: ${openTime} - ${closeTime}</li>`;
+}).join('');
 
       if(!row || !row.is_open){
         return `<li>${day}: Closed</li>`;
@@ -4495,51 +4517,68 @@ async function saveRestaurantProfile(){
   return restaurant.id;
 }
    async function saveRestaurantHours(){
-  const restaurantId = await getCurrentRestaurantId();
+  const restaurant = await getCurrentRestaurant();
 
-  if(!restaurantId){
+  if(!restaurant){
     toast('Restaurant not found', 'err');
     return;
   }
 
-  const rows = [...document.querySelectorAll('#hrs-grid .hrs-row')];
-  const payload = rows.map((row, i) => {
-    const isOpen = row.querySelector('input[type="checkbox"]')?.checked || false;
-    const times = row.querySelectorAll('input[type="time"]');
-    const openTime = times[0]?.value || null;
-    const closeTime = times[1]?.value || null;
+  const rows = [];
 
-    return {
-      restaurant_id: restaurantId,
-      day: DAYS[i],
+  document.querySelectorAll('.hrs-row').forEach(row => {
+    const day = row.dataset.day;
+    const toggle = row.querySelector('input[type="checkbox"]');
+    const timeInputs = row.querySelectorAll('input[type="time"]');
+
+    const isOpen = !!toggle?.checked;
+    const openTime = timeInputs[0]?.value || null;
+    const closeTime = timeInputs[1]?.value || null;
+
+    rows.push({
+      restaurant_id: restaurant.id,
+      day: String(day).trim(),
+      is_open: isOpen,
       open_time: isOpen ? openTime : null,
-      close_time: isOpen ? closeTime : null,
-      is_open: isOpen
-    };
+      close_time: isOpen ? closeTime : null
+    });
   });
+
+  const note = document.getElementById('hours-note')?.value?.trim() || null;
 
   const { error: deleteError } = await supabaseClient
     .from('restaurant_hours')
     .delete()
-    .eq('restaurant_id', restaurantId);
+    .eq('restaurant_id', restaurant.id);
 
   if(deleteError){
-    console.error(deleteError);
-    toast('Could not clear old hours', 'err');
+    console.error('Delete old restaurant hours error:', deleteError);
+    toast(deleteError.message || 'Could not clear old opening hours', 'err');
     return;
   }
 
   const { error: insertError } = await supabaseClient
     .from('restaurant_hours')
-    .insert(payload);
+    .insert(rows);
 
   if(insertError){
-    console.error(insertError);
-    toast(insertError.message || 'Could not save hours', 'err');
+    console.error('Insert restaurant hours error:', insertError);
+    toast(insertError.message || 'Could not save opening hours', 'err');
     return;
   }
 
-  toast('Opening hours saved ✅', 'ok');
+  const { error: restaurantUpdateError } = await supabaseClient
+    .from('restaurants')
+    .update({ hours_note: note })
+    .eq('id', restaurant.id);
+
+  if(restaurantUpdateError){
+    console.error('Restaurant hours note update error:', restaurantUpdateError);
+    toast(restaurantUpdateError.message || 'Hours saved, but note failed', 'err');
+    return;
+  }
+
+  toast('Opening hours saved! ✅', 'ok');
 }
    async function loadRestaurantHours(){
   const restaurantId = await getCurrentRestaurantId();
