@@ -1081,7 +1081,11 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
   <div class="deals-heading">🔥 Hot Deals Right Now</div>
   <div class="deals-grid" id="deals-grid"></div>
 </div>
-
+<div class="deals-wrap" style="padding-top:0">
+  <div class="deals-heading">❤️ My Favorites</div>
+  <div class="deals-grid" id="favorite-deals-grid"></div>
+</div>
+   
 <div class="deals-wrap" style="padding-top:0">
   <div class="deals-heading">📅 My Reservations</div>
   <div id="customer-reservations-list" style="display:flex;flex-direction:column;gap:12px"></div>
@@ -1130,6 +1134,20 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
         <h4>Opening Hours</h4>
         <ul id="restaurant-profile-hours-list"></ul>
       </div>
+       <div class="modal-tc">
+  <h4>Leave a Rating</h4>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px" id="restaurant-rating-stars">
+    <button type="button" class="btn-ghost" onclick="setRestaurantRating(1)">1★</button>
+    <button type="button" class="btn-ghost" onclick="setRestaurantRating(2)">2★</button>
+    <button type="button" class="btn-ghost" onclick="setRestaurantRating(3)">3★</button>
+    <button type="button" class="btn-ghost" onclick="setRestaurantRating(4)">4★</button>
+    <button type="button" class="btn-ghost" onclick="setRestaurantRating(5)">5★</button>
+  </div>
+  <textarea class="input-field" id="restaurant-rating-comment" rows="3" placeholder="Optional comment"></textarea>
+  <div style="display:flex;justify-content:flex-end;margin-top:12px">
+    <button class="btn-gold" onclick="submitRestaurantReview()">Submit Review</button>
+  </div>
+</div>
     </div>
   </div>
 </div>
@@ -2503,6 +2521,119 @@ function selectPriceTier(tier){
   document.querySelectorAll('.price-tier-btn').forEach(btn => {
     btn.classList.toggle('on', Number(btn.dataset.tier) === Number(tier));
   });
+}
+   let _selectedRestaurantRating = 0;
+
+function setRestaurantRating(value){
+  _selectedRestaurantRating = value;
+
+  document.querySelectorAll('#restaurant-rating-stars button').forEach((btn, idx) => {
+    btn.classList.toggle('btn-gold', idx + 1 === value);
+    btn.classList.toggle('btn-ghost', idx + 1 !== value);
+  });
+}
+async function loadRestaurantOverviewStats(){
+  const restaurant = await getCurrentRestaurant();
+  if(!restaurant) return;
+
+  const { data: offers, error: offersError } = await supabaseClient
+    .from('offers')
+    .select('id')
+    .eq('restaurant_id', restaurant.id);
+
+  if(offersError){
+    console.error('Overview offers error:', offersError);
+    return;
+  }
+
+  const offerIds = (offers || []).map(o => o.id);
+
+  let redeemedCount = 0;
+  let favoritesCount = 0;
+  let avgRating = 0;
+
+  if(offerIds.length){
+    const { data: coupons, error: couponsError } = await supabaseClient
+      .from('coupon_codes')
+      .select('id,status,offer_id')
+      .in('offer_id', offerIds);
+
+    if(!couponsError){
+      redeemedCount = (coupons || []).filter(c => String(c.status || '').toLowerCase() === 'redeemed').length;
+    } else {
+      console.error('Overview coupons error:', couponsError);
+    }
+
+    const { data: favs, error: favsError } = await supabaseClient
+      .from('offer_favorites')
+      .select('id,offer_id')
+      .in('offer_id', offerIds);
+
+    if(!favsError){
+      favoritesCount = (favs || []).length;
+    } else {
+      console.error('Overview favorites error:', favsError);
+    }
+  }
+
+  const { data: reviews, error: reviewsError } = await supabaseClient
+    .from('restaurant_reviews')
+    .select('rating')
+    .eq('restaurant_id', restaurant.id);
+
+  if(!reviewsError){
+    const vals = (reviews || []).map(r => Number(r.rating || 0));
+    avgRating = vals.length ? (vals.reduce((a,b) => a + b, 0) / vals.length) : 0;
+  } else {
+    console.error('Overview reviews error:', reviewsError);
+  }
+
+  const redeemedEl = document.getElementById('overview-redeemed');
+  const favoritesEl = document.getElementById('overview-favorites');
+  const ratingEl = document.getElementById('overview-rating');
+
+  if(redeemedEl) redeemedEl.textContent = redeemedCount.toLocaleString();
+  if(favoritesEl) favoritesEl.textContent = favoritesCount.toLocaleString();
+  if(ratingEl) ratingEl.textContent = `${avgRating.toFixed(1)} ⭐`;
+}
+async function submitRestaurantReview(){
+  if(!_modalDeal?.restaurant_id){
+    toast('Restaurant not found', 'err');
+    return;
+  }
+
+  const { data: authData, error: authError } = await supabaseClient.auth.getUser();
+
+  if(authError || !authData?.user){
+    toast('Please sign in first', 'err');
+    return;
+  }
+
+  if(_selectedRestaurantRating < 0 || _selectedRestaurantRating > 5){
+    toast('Choose a rating from 0 to 5', 'err');
+    return;
+  }
+
+  const comment = document.getElementById('restaurant-rating-comment')?.value?.trim() || '';
+
+  const { error } = await supabaseClient
+    .from('restaurant_reviews')
+    .upsert({
+      restaurant_id: _modalDeal.restaurant_id,
+      user_id: authData.user.id,
+      rating: _selectedRestaurantRating,
+      comment
+    }, {
+      onConflict: 'restaurant_id,user_id'
+    });
+
+  if(error){
+    console.error('Review save error:', error);
+    toast(error.message || 'Could not save review', 'err');
+    return;
+  }
+
+  toast('Review saved! ⭐', 'ok');
 }
   async function handleInitialSession(){
   try {
@@ -3929,7 +4060,75 @@ function setFilter(el,f){
   el.classList.add('on');activeFilter=f;renderDeals();
 }
 let DEALS = [];
+async function loadFavoriteOfferIds(){
+  const { data: authData, error: authError } = await supabaseClient.auth.getUser();
 
+  if(authError || !authData?.user){
+    _favoriteOfferIds = new Set();
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from('offer_favorites')
+    .select('offer_id')
+    .eq('user_id', authData.user.id);
+
+  if(error){
+    console.error('Favorites load error:', error);
+    _favoriteOfferIds = new Set();
+    return;
+  }
+
+  _favoriteOfferIds = new Set((data || []).map(x => x.offer_id));
+}
+
+async function toggleFavorite(offerId){
+  const { data: authData, error: authError } = await supabaseClient.auth.getUser();
+
+  if(authError || !authData?.user){
+    toast('Please sign in first', 'err');
+    return;
+  }
+
+  const userId = authData.user.id;
+  const isSaved = _favoriteOfferIds.has(offerId);
+
+  if(isSaved){
+    const { error } = await supabaseClient
+      .from('offer_favorites')
+      .delete()
+      .eq('user_id', userId)
+      .eq('offer_id', offerId);
+
+    if(error){
+      console.error('Favorite delete error:', error);
+      toast(error.message || 'Could not remove favorite', 'err');
+      return;
+    }
+
+    _favoriteOfferIds.delete(offerId);
+    toast('Removed from favorites', 'ok');
+  } else {
+    const { error } = await supabaseClient
+      .from('offer_favorites')
+      .insert({
+        user_id: userId,
+        offer_id: offerId
+      });
+
+    if(error){
+      console.error('Favorite insert error:', error);
+      toast(error.message || 'Could not save favorite', 'err');
+      return;
+    }
+
+    _favoriteOfferIds.add(offerId);
+    toast('Saved to favorites ❤️', 'ok');
+  }
+
+  renderDeals();
+  renderFavoriteDeals();
+}
 function renderDeals(){
   const q=(document.getElementById('deal-search')?.value||'').toLowerCase();
   const grid=document.getElementById('deals-grid');
@@ -3956,7 +4155,12 @@ function renderDeals(){
         <div class="deal-desc">${d.desc.slice(0,80)}…</div>
         <div class="deal-foot">
           <div class="deal-prices"><span class="deal-orig">${d.orig}</span><span class="deal-new">${d.price}</span></div>
-          <button class="heart-btn" onclick="event.stopPropagation();this.classList.toggle('saved');toast(this.classList.contains('saved')?'Saved ❤️':'Removed','ok')">♡</button>
+          <button
+  class="heart-btn ${isSaved ? 'saved' : ''}"
+  onclick="event.stopPropagation(); toggleFavorite(${d.id})"
+>
+  ${isSaved ? '♥' : '♡'}
+</button>
         </div>
       </div>
     </div>
@@ -3976,6 +4180,47 @@ function liveCode(dealKey){
   for(let i=0;i<seed.length;i++){h=((h<<5)+h)^seed.charCodeAt(i);h>>>=0}
   const b36=h.toString(36).toUpperCase().padEnd(6,'0').slice(0,6);
   return `TD-${dealKey}-${b36}`;
+}
+   function renderFavoriteDeals(){
+  const wrap = document.getElementById('favorite-deals-grid');
+  if(!wrap) return;
+
+  const favDeals = (window._allDeals || []).filter(d => _favoriteOfferIds.has(d.id));
+
+  if(!favDeals.length){
+    wrap.innerHTML = `<div style="color:var(--text-muted);font-size:.9rem">No favorites yet.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = favDeals.map(d => {
+    return `
+      <div class="deal-card" onclick="openDeal(${d.id})">
+        <div class="deal-img">
+          <img src="${d.img}" alt="">
+          <div class="deal-disc">${d.discount}</div>
+          <div class="deal-cat">${d.category || ''}</div>
+        </div>
+        <div class="deal-body">
+          <div class="deal-rest">
+            ${d.restaurant || ''}
+            <span class="dist">${d.distance || ''}</span>
+          </div>
+          <div class="deal-title">${d.title}</div>
+          <div class="deal-desc">${d.desc || ''}</div>
+          <div class="deal-foot">
+            <div class="deal-prices">
+              <span class="deal-orig">${d.originalPrice || ''}</span>
+              <span class="deal-new">${d.newPrice || ''}</span>
+            </div>
+            <button
+              class="heart-btn saved"
+              onclick="event.stopPropagation(); toggleFavorite(${d.id})"
+            >♥</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
    async function loadCustomerDeals(){
   const { data: offers, error } = await supabaseClient
