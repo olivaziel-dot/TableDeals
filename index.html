@@ -4167,11 +4167,23 @@ startCouponTimer(d.dealKey);
 
   const hoursList = document.getElementById('restaurant-profile-hours-list');
   hoursList.innerHTML = '<li>Loading opening hours...</li>';
+console.log('Customer modal _modalDeal:', _modalDeal);
+console.log('Customer modal restaurant_id:', _modalDeal?.restaurant_id);
+  const restaurantId = _modalDeal?.restaurant_id || _modalDeal?.restaurant?.id || null;
 
-  const { data: hours, error } = await supabaseClient
-    .from('restaurant_hours')
-    .select('*')
-    .eq('restaurant_id', _modalDeal.restaurant_id);
+console.log('Customer modal _modalDeal:', _modalDeal);
+console.log('Customer modal restaurantId used for hours:', restaurantId);
+
+if(!restaurantId){
+  hoursList.innerHTML = '<li>Restaurant ID missing</li>';
+  document.getElementById('restaurant-profile-overlay').classList.add('open');
+  return;
+}
+
+const { data: hours, error } = await supabaseClient
+  .from('restaurant_hours')
+  .select('*')
+  .eq('restaurant_id', restaurantId);
 
   if(error){
     console.error('Error loading restaurant profile hours:', error);
