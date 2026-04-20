@@ -1064,18 +1064,18 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
   </div>
   <!-- Filters -->
   <div class="filters" id="filters">
-    <button class="f-chip on" onclick="setFilter(this,'all')">🌟 All</button>
-    <button class="f-chip" onclick="setFilter(this,'burger')">🍔 Burgers</button>
-    <button class="f-chip" onclick="setFilter(this,'pizza')">🍕 Pizza</button>
-    <button class="f-chip" onclick="setFilter(this,'lebanese')">🥗 Lebanese</button>
-    <button class="f-chip" onclick="setFilter(this,'sushi')">🍣 Sushi</button>
-    <button class="f-chip" onclick="setFilter(this,'brunch')">☕ Brunch</button>
-    <button class="f-chip" onclick="setFilter(this,'grill')">🥩 Grills</button>
-    <button class="f-chip" onclick="setFilter(this,'beirut')">📍 Beirut</button>
-    <button class="f-chip" onclick="setFilter(this,'jounieh')">📍 Jounieh</button>
-    <button class="f-chip" onclick="setFilter(this,'lunch')">🌞 Lunch</button>
-    <button class="f-chip" onclick="setFilter(this,'dinner')">🌙 Dinner</button>
-  </div>
+  <button class="f-chip on" onclick="setFilter(this,'all')">🌟 All</button>
+  <button class="f-chip" onclick="setFilter(this,'favorites')">❤️ Favorites</button>
+  <button class="f-chip" onclick="setFilter(this,'burger')">🍔 Burgers</button>
+  <button class="f-chip" onclick="setFilter(this,'pizza')">🍕 Pizza</button>
+  <button class="f-chip" onclick="setFilter(this,'lebanese')">🥗 Lebanese</button>
+  <button class="f-chip" onclick="setFilter(this,'sushi')">🍣 Sushi</button>
+  <button class="f-chip" onclick="setFilter(this,'brunch')">☕ Brunch</button>
+  <button class="f-chip" onclick="setFilter(this,'grill')">🥩 Grills</button>
+  <button class="f-chip" onclick="setFilter(this,'beirut')">📍 Beirut</button>
+  <button class="f-chip" onclick="setFilter(this,'lunch')">🌞 Lunch</button>
+  <button class="f-chip" onclick="setFilter(this,'dinner')">🌙 Dinner</button>
+</div>
   <!-- Deals -->
   <div class="deals-wrap">
   <div class="deals-heading">🔥 Hot Deals Right Now</div>
@@ -1236,14 +1236,11 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
   id="report-issue-reason"
   rows="4"
   maxlength="130"
-  placeholder="Describe the problem (max 130 characters)..."
+  placeholder="Describe the problem..."
   style="resize:vertical"
   oninput="updateReportCharCount()"
 ></textarea>
-
-<div id="report-char-count" style="font-size:.75rem;color:var(--text-muted);margin-top:4px">
-  0 / 130
-</div>
+<div id="report-char-count" style="font-size:.75rem;color:var(--text-muted);margin-top:4px;text-align:right">0 / 130</div>
       </div>
 
       <button class="btn-gold" style="width:100%;padding:13px" onclick="submitIssueReport()">Send Report</button>
@@ -4407,7 +4404,12 @@ function renderDeals(){
   if(!grid) return;
 
   let list=DEALS.filter(d=>{
-    const matchF=activeFilter==='all'||d.cat===activeFilter||d.district.toLowerCase().includes(activeFilter)||d.time===activeFilter;
+    const matchF =
+  activeFilter==='all' ||
+  (activeFilter==='favorites' && _favoriteOfferIds.has(d.id)) ||
+  d.cat===activeFilter ||
+  d.district.toLowerCase().includes(activeFilter) ||
+  d.time===activeFilter;
     const matchQ=!q||(d.title+d.restaurant+d.district).toLowerCase().includes(q);
     return matchF&&matchQ;
   });
@@ -4789,6 +4791,12 @@ hoursList.innerHTML = orderedDays.map(day => {
 function closeRestaurantProfileModal(){
   const overlay = document.getElementById('restaurant-profile-overlay');
   if(overlay) overlay.classList.remove('open');
+}
+   function updateReportCharCount(){
+  const el = document.getElementById('report-issue-reason');
+  const counter = document.getElementById('report-char-count');
+  if(!el || !counter) return;
+  counter.textContent = `${el.value.length} / 130`;
 }
    function closeReportIssueModal(){
   const overlay = document.getElementById('report-issue-overlay');
