@@ -3752,9 +3752,12 @@ function addTC(){
 let activeFilter='all';
 async function initCustomer(){
   await loadCurrentUserProfile();
+  await loadFavoriteOfferIds();
   await loadCustomerDeals();
+  renderDeals();
+  renderFavoriteDeals();
   await loadCustomerReservations();
-   await loadCustomerRedemptions();
+  await loadCustomerRedemptions();
 }
    async function loadRestaurantOffers(){
   const restaurantId = await getCurrentRestaurantId();
@@ -4218,22 +4221,22 @@ async function toggleFavorite(offerId){
   renderFavoriteDeals();
 }
 function renderDeals(){
-  const q = (document.getElementById('deal-search')?.value || '').toLowerCase();
-  const grid = document.getElementById('deals-grid');
+  const q=(document.getElementById('deal-search')?.value||'').toLowerCase();
+  const grid=document.getElementById('deals-grid');
   if(!grid) return;
 
-  let list = DEALS.filter(d => {
-    const matchF = activeFilter === 'all' || d.cat === activeFilter || d.district.toLowerCase().includes(activeFilter) || d.time === activeFilter;
-    const matchQ = !q || (d.title + d.restaurant + d.district).toLowerCase().includes(q);
-    return matchF && matchQ;
+  let list=DEALS.filter(d=>{
+    const matchF=activeFilter==='all'||d.cat===activeFilter||d.district.toLowerCase().includes(activeFilter)||d.time===activeFilter;
+    const matchQ=!q||(d.title+d.restaurant+d.district).toLowerCase().includes(q);
+    return matchF&&matchQ;
   });
 
   if(!list.length){
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 0;color:var(--text-muted)">No deals found. Try a different filter.</div>';
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px 0;color:var(--text-muted)">No deals found. Try a different filter.</div>';
     return;
   }
 
-  grid.innerHTML = list.map(d => {
+  grid.innerHTML=list.map(d=>{
     const isSaved = _favoriteOfferIds.has(d.id);
 
     return `
@@ -4248,10 +4251,7 @@ function renderDeals(){
           <div class="deal-title">${d.title}</div>
           <div class="deal-desc">${d.desc.slice(0,80)}…</div>
           <div class="deal-foot">
-            <div class="deal-prices">
-              <span class="deal-orig">${d.orig}</span>
-              <span class="deal-new">${d.price}</span>
-            </div>
+            <div class="deal-prices"><span class="deal-orig">${d.orig}</span><span class="deal-new">${d.price}</span></div>
             <button
               class="heart-btn ${isSaved ? 'saved' : ''}"
               onclick="event.stopPropagation(); toggleFavorite('${d.id}')"
@@ -4284,42 +4284,37 @@ function liveCode(dealKey){
   const wrap = document.getElementById('favorite-deals-grid');
   if(!wrap) return;
 
-  const favDeals = (window._allDeals || []).filter(d => _favoriteOfferIds.has(d.id));
+  const favDeals = DEALS.filter(d => _favoriteOfferIds.has(d.id));
 
   if(!favDeals.length){
     wrap.innerHTML = `<div style="color:var(--text-muted);font-size:.9rem">No favorites yet.</div>`;
     return;
   }
 
-  wrap.innerHTML = favDeals.map(d => {
-    return `
-      <div class="deal-card" onclick="openDeal(${d.id})">
-        <div class="deal-img">
-          <img src="${d.img}" alt="">
-          <div class="deal-disc">${d.discount}</div>
-          <div class="deal-cat">${d.category || ''}</div>
-        </div>
-        <div class="deal-body">
-          <div class="deal-rest">
-            ${d.restaurant || ''}
-            <span class="dist">${d.distance || ''}</span>
+  wrap.innerHTML = favDeals.map(d => `
+    <div class="deal-card" onclick="openDeal('${d.id}')">
+      <div class="deal-img">
+        <img src="${d.img}" alt="" loading="lazy"/>
+        <div class="deal-disc">${d.disc}</div>
+        <div class="deal-cat">${d.cat}</div>
+      </div>
+      <div class="deal-body">
+        <div class="deal-rest">${d.restaurant} <span class="dist">${d.district}</span></div>
+        <div class="deal-title">${d.title}</div>
+        <div class="deal-desc">${d.desc.slice(0,80)}…</div>
+        <div class="deal-foot">
+          <div class="deal-prices">
+            <span class="deal-orig">${d.orig}</span>
+            <span class="deal-new">${d.price}</span>
           </div>
-          <div class="deal-title">${d.title}</div>
-          <div class="deal-desc">${d.desc || ''}</div>
-          <div class="deal-foot">
-            <div class="deal-prices">
-              <span class="deal-orig">${d.originalPrice || ''}</span>
-              <span class="deal-new">${d.newPrice || ''}</span>
-            </div>
-            <button
-              class="heart-btn saved"
-              onclick="event.stopPropagation(); toggleFavorite(${d.id})"
-            >♥</button>
-          </div>
+          <button
+            class="heart-btn saved"
+            onclick="event.stopPropagation(); toggleFavorite('${d.id}')"
+          >♥</button>
         </div>
       </div>
-    `;
-  }).join('');
+    </div>
+  `).join('');
 }
    async function loadCustomerDeals(){
   const { data: offers, error } = await supabaseClient
