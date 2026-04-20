@@ -4824,12 +4824,12 @@ async function submitIssueReport(){
   }
 
   const issueType = document.getElementById('report-issue-type')?.value || 'other';
-  const reason = document.getElementById('report-issue-reason')?.value?.trim() || '';
+  const reason = (document.getElementById('report-issue-reason')?.value || '').trim().slice(0, 130);
 
   const { error } = await supabaseClient
     .from('offer_reports')
     .insert({
-      offer_id: _modalDeal.id || null,
+      offer_id: null,
       restaurant_id: _modalDeal.restaurant_id || null,
       reporter_user_id: authData.user.id,
       issue_type: issueType,
