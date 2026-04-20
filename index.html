@@ -4826,18 +4826,19 @@ async function submitIssueReport(){
   const issueType = document.getElementById('report-issue-type')?.value || 'other';
   const reason = (document.getElementById('report-issue-reason')?.value || '').trim().slice(0, 130);
 
+  const payload = {
+    restaurant_id: _modalDeal.restaurant_id || null,
+    reporter_user_id: authData.user.id,
+    issue_type: issueType,
+    reason
+  };
+
   const { error } = await supabaseClient
     .from('offer_reports')
-    .insert({
-      offer_id: null,
-      restaurant_id: _modalDeal.restaurant_id || null,
-      reporter_user_id: authData.user.id,
-      issue_type: issueType,
-      reason
-    });
+    .insert(payload);
 
   if(error){
-    console.error('Report insert error:', error);
+    console.error('Report insert error:', error, payload);
     toast(error.message || 'Could not submit report', 'err');
     return;
   }
