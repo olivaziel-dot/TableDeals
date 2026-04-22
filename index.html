@@ -3643,60 +3643,7 @@ async function submitRedemptionReview(redemptionId, restaurantId){
 
   toast('Review saved! ⭐', 'ok');
 }
-   const _selectedRedemptionRatings = {};
 
-function setRedemptionRating(redemptionId, rating){
-  _selectedRedemptionRatings[redemptionId] = rating;
-
-  document.querySelectorAll(`[data-redemption-rating="${redemptionId}"]`).forEach(btn => {
-    const btnRating = Number(btn.dataset.rating || 0);
-    if(btnRating <= rating){
-      btn.classList.add('saved');
-      btn.textContent = '★';
-    } else {
-      btn.classList.remove('saved');
-      btn.textContent = '☆';
-    }
-  });
-}
-
-async function submitRedemptionReview(redemptionId, restaurantId){
-  const { data: authData, error: authError } = await supabaseClient.auth.getUser();
-
-  if(authError || !authData?.user){
-    toast('Please sign in first', 'err');
-    return;
-  }
-
-  const rating = Number(_selectedRedemptionRatings[redemptionId] || 0);
-  if(rating < 1 || rating > 5){
-    toast('Please choose 1 to 5 stars', 'err');
-    return;
-  }
-
-  const commentEl = document.getElementById(`review-comment-${redemptionId}`);
-  const comment = commentEl?.value?.trim() || '';
-
-  const { error } = await supabaseClient
-    .from('restaurant_reviews')
-    .upsert({
-      redemption_id: redemptionId,
-      restaurant_id: restaurantId,
-      user_id: authData.user.id,
-      rating,
-      comment
-    }, {
-      onConflict: 'redemption_id'
-    });
-
-  if(error){
-    console.error('Review save error:', error);
-    toast(error.message || 'Could not save review', 'err');
-    return;
-  }
-
-  toast('Review saved! ⭐', 'ok');
-}
 async function loadCustomerRedemptions(){
   const { data: authData, error: authError } = await supabaseClient.auth.getUser();
 
