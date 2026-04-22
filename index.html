@@ -3623,19 +3623,45 @@ async function submitRedemptionReview(redemptionId, restaurantId){
   const commentEl = document.getElementById(`review-comment-${redemptionId}`);
   const comment = commentEl?.value?.trim() || '';
 
-  const { error } = await supabaseClient
-  .from('restaurant_reviews')
-  .upsert([
-    {
-      redemption_id: redemptionId,
-      restaurant_id: restaurantId,
-      user_id: authData.user.id,
-      rating,
-      comment
-    }
-  ], {
-    onConflict: 'redemption_id'
-  });
+  const { data: existingReview, error: existingError } = await supabaseClient
+    .from('restaurant_reviews')
+    .select('id')
+    .eq('redemption_id', redemptionId)
+    .maybeSingle();
+
+  if(existingError){
+    console.error('Review lookup error:', existingError);
+    toast(existingError.message || 'Could not check existing review', 'err');
+    return;
+  }
+
+  let error = null;
+
+  if(existingReview?.id){
+    const res = await supabaseClient
+      .from('restaurant_reviews')
+      .update({
+        restaurant_id: restaurantId,
+        user_id: authData.user.id,
+        rating,
+        comment
+      })
+      .eq('id', existingReview.id);
+
+    error = res.error;
+  } else {
+    const res = await supabaseClient
+      .from('restaurant_reviews')
+      .insert({
+        redemption_id: redemptionId,
+        restaurant_id: restaurantId,
+        user_id: authData.user.id,
+        rating,
+        comment
+      });
+
+    error = res.error;
+  }
 
   if(error){
     console.error('Review save error:', error);
@@ -3644,8 +3670,8 @@ async function submitRedemptionReview(redemptionId, restaurantId){
   }
 
   toast('Review saved! ⭐', 'ok');
+  await loadCustomerRedemptions();
 }
-
 async function loadCustomerRedemptions(){
   const { data: authData, error: authError } = await supabaseClient.auth.getUser();
 
