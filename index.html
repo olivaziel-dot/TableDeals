@@ -1801,11 +1801,22 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
       </div>
       <!-- ALL RESTAURANTS -->
       <div class="pane" id="pane-m-restaurants">
-        <div class="rdash-header"><h1>All Restaurants</h1><p>Approve new partners, manage existing ones, remove bad actors.</p></div>
-        <div class="t-wrap">
-          <table class="tbl">
-            <thead><tr><th>Restaurant</th><th>Owner</th><th>District</th><th>Plan</th><th>Deals</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
+  <div class="rdash-header"><h1>All Restaurants</h1><p>Approve new partners, manage existing ones, remove bad actors.</p></div>
+
+  <div style="display:flex;gap:10px;margin-bottom:16px">
+    <input
+      class="input-field"
+      id="manager-restaurant-search"
+      placeholder="Search restaurant by name, owner, district or email…"
+      style="max-width:380px"
+      oninput="loadManagerRestaurants()"
+    />
+  </div>
+
+  <div class="t-wrap">
+    <table class="tbl">
+      <thead><tr><th>Restaurant</th><th>Owner</th><th>District</th><th>Plan</th><th>Deals</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="manager-restaurants-body">
               <tr><td><strong style="color:var(--text)">Burgerlicious Beirut</strong></td><td>Rania Salameh</td><td>Mar Mikhael</td><td><span class="badge-blue">Growth $59</span></td><td>3</td><td><span class="badge-green">Active</span></td><td><button class="btn-ghost">View</button> <button class="btn-danger" onclick="toast('Restaurant suspended','err')">Suspend</button></td></tr>
               <tr><td><strong style="color:var(--text)">Liza Beirut</strong></td><td>Georges Khoury</td><td>Gemmayzeh</td><td><span class="badge-blue">Growth $59</span></td><td>2</td><td><span class="badge-green">Active</span></td><td><button class="btn-ghost">View</button> <button class="btn-danger" onclick="toast('Restaurant suspended','err')">Suspend</button></td></tr>
               <tr><td><strong style="color:var(--text)">Sky Rooftop Bar</strong></td><td>Rima Abi Nader</td><td>Downtown</td><td><span class="tag">Starter $29</span></td><td>1</td><td><span class="badge-yellow">Pending</span></td><td><button class="btn-gold" style="padding:5px 14px;font-size:.78rem" onclick="toast('Restaurant approved! 🎉','ok')">Approve</button> <button class="btn-danger" onclick="toast('Rejected','err')">Reject</button></td></tr>
@@ -2774,6 +2785,29 @@ async function submitRestaurantReview(){
     await supabaseClient.auth.signOut();
     await go('landing');
   }
+}
+   function managerViewRestaurant(restaurantId){
+  const searchInput = document.getElementById('manager-restaurant-search');
+  if(searchInput){
+    searchInput.value = restaurantId;
+  }
+  loadManagerRestaurants();
+}
+
+async function managerToggleRestaurantStatus(restaurantId, nextState){
+  const { error } = await supabaseClient
+    .from('restaurants')
+    .update({ is_active: nextState })
+    .eq('id', restaurantId);
+
+  if(error){
+    console.error('Restaurant status update error:', error);
+    toast(error.message || 'Could not update restaurant status', 'err');
+    return;
+  }
+
+  toast(nextState ? 'Restaurant activated' : 'Restaurant suspended', 'ok');
+  await loadManagerRestaurants();
 }
    async function loadManagerActivity(){
   const feed = document.getElementById('manager-activity-feed');
@@ -5407,6 +5441,24 @@ async function initManager(){
   await loadManagerPlans();
   await loadPlatformSettings();
 }
+   function openRestaurantFromReport(restaurantId, restaurantName){
+  const links = document.querySelectorAll('#page-manager .sb-link');
+  links.forEach(l => l.classList.remove('on'));
+
+  const restaurantsLink = Array.from(links).find(l => l.textContent.includes('All Restaurants'));
+  if(restaurantsLink) restaurantsLink.classList.add('on');
+
+  document.querySelectorAll('#page-manager .pane').forEach(p => p.classList.remove('on'));
+  const pane = document.getElementById('pane-m-restaurants');
+  if(pane) pane.classList.add('on');
+
+  const searchInput = document.getElementById('manager-restaurant-search');
+  if(searchInput){
+    searchInput.value = restaurantName || restaurantId || '';
+  }
+
+  loadManagerRestaurants();
+}
    async function loadManagerReports(){
   const feed = document.getElementById('manager-reports-feed');
   if(!feed) return;
@@ -5471,7 +5523,8 @@ async function initManager(){
       <div class="activity-item">
         <div class="act-icon">⚠️</div>
         <div class="act-text">
-          <strong>${userName}</strong> reported <strong>${restaurantName}</strong><br/>
+          <strong>${userName}</strong> reported
+<strong style="cursor:pointer;color:var(--gold)" onclick="openRestaurantFromReport('${rep.restaurant_id}', '${restaurantName.replace(/'/g, "\\'")}')">${restaurantName}</strong><br/>
           <span style="color:var(--gold)">Type:</span> ${issueLabel}<br/>
           <span style="color:var(--gold)">Message:</span> ${rep.reason || '-'}<br/>
           <span style="color:var(--gold)">Status:</span> ${rep.status || 'open'}
@@ -5536,7 +5589,9 @@ async function initManager(){
     </tr>
   `).join('');
 }
-   async function loadManagerRestaurants(){
+  async function loadManagerRestaurants(){
+  const searchValue = (document.getElementById('manager-restaurant-search')?.value || '').trim().toLowerCase();
+
   const { data: restaurants, error: restaurantsError } = await supabaseClient
     .from('restaurants')
     .select('*')
@@ -5547,7 +5602,7 @@ async function initManager(){
     return;
   }
 
-  const tbody = document.querySelector('#pane-m-restaurants tbody');
+  const tbody = document.getElementById('manager-restaurants-body');
   if(!tbody) return;
 
   if(!restaurants || !restaurants.length){
@@ -5571,56 +5626,84 @@ async function initManager(){
     if(ownersError){
       console.error('Error loading restaurant owners:', ownersError);
     } else {
-      (owners || []).forEach(owner => {
-        ownerMap[owner.id] = owner;
+      ownerMap = Object.fromEntries((owners || []).map(o => [o.id, o]));
+    }
+  }
+
+  const restaurantIds = restaurants.map(r => r.id).filter(Boolean);
+
+  let offerCounts = {};
+  if(restaurantIds.length){
+    const { data: offers, error: offersError } = await supabaseClient
+      .from('offers')
+      .select('id, restaurant_id')
+      .in('restaurant_id', restaurantIds);
+
+    if(offersError){
+      console.error('Error loading restaurant offers count:', offersError);
+    } else {
+      (offers || []).forEach(o => {
+        offerCounts[o.restaurant_id] = (offerCounts[o.restaurant_id] || 0) + 1;
       });
     }
   }
 
-  let offerCountMap = {};
-  const { data: offers, error: offersError } = await supabaseClient
-    .from('offers')
-    .select('id, restaurant_id');
+  let filtered = restaurants.filter(r => {
+    const owner = ownerMap[r.owner_id] || {};
+    const haystack = [
+      r.name || '',
+      r.location || '',
+      r.cuisine_type || '',
+      owner.name || '',
+      owner.email || ''
+    ].join(' ').toLowerCase();
 
-  if(offersError){
-    console.error('Error loading restaurant offers for manager:', offersError);
-  } else {
-    (offers || []).forEach(offer => {
-      offerCountMap[offer.restaurant_id] = (offerCountMap[offer.restaurant_id] || 0) + 1;
-    });
+    return !searchValue || haystack.includes(searchValue);
+  });
+
+  if(!filtered.length){
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center;color:var(--text-muted)">No matching restaurants found</td>
+      </tr>
+    `;
+    return;
   }
 
-  tbody.innerHTML = restaurants.map(r => {
+  tbody.innerHTML = filtered.map(r => {
     const owner = ownerMap[r.owner_id] || {};
-    const offerCount = offerCountMap[r.id] || 0;
-
-    const statusHtml =
-      r.status === 'suspended'
-        ? '<span class="badge-red">Suspended</span>'
-        : r.status === 'pending'
-        ? '<span class="badge-yellow">Pending</span>'
-        : '<span class="badge-green">Active</span>';
-
-    const actionsHtml =
-      r.status === 'suspended'
-        ? `
-          <button class="btn-ghost" onclick="managerViewRestaurant('${r.id}')">View</button>
-          <button class="unban-btn" onclick="managerToggleRestaurantStatus('${r.id}','active')">Activate</button>
-        `
-        : `
-          <button class="btn-ghost" onclick="managerViewRestaurant('${r.id}')">View</button>
-          <button class="ban-btn" onclick="managerToggleRestaurantStatus('${r.id}','suspended')">Suspend</button>
-        `;
+    const dealsCount = offerCounts[r.id] || 0;
 
     return `
       <tr>
         <td><strong style="color:var(--text)">${r.name || '-'}</strong></td>
         <td>${owner.name || owner.email || '-'}</td>
         <td>${r.location || '-'}</td>
-        <td><span class="badge-blue">Partner</span></td>
-        <td>${offerCount}</td>
-        <td>${statusHtml}</td>
-        <td>${actionsHtml}</td>
+        <td>
+          <span class="${
+            r.plan_code === 'growth' ? 'badge-blue' :
+            r.plan_code === 'starter' ? 'badge-green' :
+            'tag'
+          }">
+            ${r.plan_code || '-'}
+          </span>
+        </td>
+        <td>${dealsCount}</td>
+        <td>
+          ${
+            r.is_active === false
+              ? '<span class="badge-red">Inactive</span>'
+              : '<span class="badge-green">Active</span>'
+          }
+        </td>
+        <td>
+          <button class="btn-ghost" onclick="managerViewRestaurant('${r.id}')">View</button>
+          ${
+            r.is_active === false
+              ? `<button class="unban-btn" onclick="managerToggleRestaurantStatus('${r.id}', true)">Activate</button>`
+              : `<button class="ban-btn" onclick="managerToggleRestaurantStatus('${r.id}', false)">Suspend</button>`
+          }
+        </td>
       </tr>
     `;
   }).join('');
