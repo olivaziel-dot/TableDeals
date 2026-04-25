@@ -2690,31 +2690,59 @@ async function submitRestaurantReview(){
     return;
   }
 
-  if(_selectedRestaurantRating < 0 || _selectedRestaurantRating > 5){
-    toast('Choose a rating from 0 to 5', 'err');
+  if(_selectedRestaurantRating < 1 || _selectedRestaurantRating > 5){
+    toast('Choose a rating from 1 to 5', 'err');
     return;
   }
 
   const comment = document.getElementById('restaurant-rating-comment')?.value?.trim() || '';
 
-  const { error } = await supabaseClient
+  const { data: existingReview, error: lookupError } = await supabaseClient
     .from('restaurant_reviews')
-    .upsert({
-      restaurant_id: _modalDeal.restaurant_id,
-      user_id: authData.user.id,
-      rating: _selectedRestaurantRating,
-      comment
-    }, {
-      onConflict: 'restaurant_id,user_id'
-    });
+    .select('id')
+    .eq('restaurant_id', _modalDeal.restaurant_id)
+    .eq('user_id', authData.user.id)
+    .maybeSingle();
 
-  if(error){
-    console.error('Review save error:', error);
-    toast(error.message || 'Could not save review', 'err');
+  if(lookupError){
+    console.error('Review lookup error:', lookupError);
+    toast(lookupError.message || 'Could not check review', 'err');
+    return;
+  }
+
+  let saveError = null;
+
+  if(existingReview?.id){
+    const res = await supabaseClient
+      .from('restaurant_reviews')
+      .update({
+        rating: _selectedRestaurantRating,
+        comment
+      })
+      .eq('id', existingReview.id);
+
+    saveError = res.error;
+  } else {
+    const res = await supabaseClient
+      .from('restaurant_reviews')
+      .insert({
+        restaurant_id: _modalDeal.restaurant_id,
+        user_id: authData.user.id,
+        rating: _selectedRestaurantRating,
+        comment
+      });
+
+    saveError = res.error;
+  }
+
+  if(saveError){
+    console.error('Review save error:', saveError);
+    toast(saveError.message || 'Could not save review', 'err');
     return;
   }
 
   toast('Review saved! ⭐', 'ok');
+  await openRestaurantProfileFromDeal();
 }
   async function handleInitialSession(){
   try {
