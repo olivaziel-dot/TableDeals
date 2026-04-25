@@ -4653,29 +4653,36 @@ function liveCode(dealKey){
 
   const offerIds = validOffers.map(o => o.id);
 let ratingMap = {};
+
 if(restaurantIds.length){
-  const { data: reviews, error: reviewsError } = await supabaseClient
-  .from('restaurant_reviews')
-  .select('restaurant_id,rating')
-  .in('restaurant_id', restaurantIds);
+  const cleanRestaurantIds = restaurantIds
+    .map(id => String(id || '').trim())
+    .filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
 
-  if(reviewsError){
-    console.error('Error loading restaurant ratings:', reviewsError);
-  } else {
-    const grouped = {};
-    (reviews || []).forEach(r => {
-      if(!grouped[r.restaurant_id]) grouped[r.restaurant_id] = [];
-      grouped[r.restaurant_id].push(Number(r.rating || 0));
-    });
+  if(cleanRestaurantIds.length){
+    const { data: reviews, error: reviewsError } = await supabaseClient
+      .from('restaurant_reviews')
+      .select('restaurant_id,rating')
+      .in('restaurant_id', cleanRestaurantIds);
 
-    Object.keys(grouped).forEach(id => {
-      const vals = grouped[id].filter(v => !Number.isNaN(v));
-      const avg = vals.length ? vals.reduce((a,b) => a + b, 0) / vals.length : 0;
-      ratingMap[id] = {
-        avg,
-        count: vals.length
-      };
-    });
+    if(reviewsError){
+      console.error('Error loading restaurant ratings:', reviewsError);
+    } else {
+      const grouped = {};
+      (reviews || []).forEach(r => {
+        if(!grouped[r.restaurant_id]) grouped[r.restaurant_id] = [];
+        grouped[r.restaurant_id].push(Number(r.rating || 0));
+      });
+
+      Object.keys(grouped).forEach(id => {
+        const vals = grouped[id].filter(v => !Number.isNaN(v));
+        const avg = vals.length ? vals.reduce((a,b) => a + b, 0) / vals.length : 0;
+        ratingMap[id] = {
+          avg,
+          count: vals.length
+        };
+      });
+    }
   }
 }
   let termsMap = {};
