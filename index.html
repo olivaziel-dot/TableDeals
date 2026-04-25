@@ -3642,6 +3642,24 @@ async function submitRedemptionReview(redemptionId, restaurantId){
     return;
   }
 
+  const { data: existingReview, error: existingError } = await supabaseClient
+    .from('restaurant_reviews')
+    .select('id')
+    .eq('redemption_id', redemptionId)
+    .maybeSingle();
+
+  if(existingError){
+    console.error('Review lookup error:', existingError);
+    toast(existingError.message || 'Could not check review', 'err');
+    return;
+  }
+
+  if(existingReview){
+    toast('You already reviewed this offer. Thank you! ⭐', 'ok');
+    await loadCustomerRedemptions();
+    return;
+  }
+
   const rating = Number(_selectedRedemptionRatings[redemptionId] || 0);
   if(rating < 1 || rating > 5){
     toast('Please choose 1 to 5 stars', 'err');
@@ -3651,53 +3669,23 @@ async function submitRedemptionReview(redemptionId, restaurantId){
   const commentEl = document.getElementById(`review-comment-${redemptionId}`);
   const comment = commentEl?.value?.trim() || '';
 
-  const { data: existingReview, error: existingError } = await supabaseClient
+  const { error } = await supabaseClient
     .from('restaurant_reviews')
-    .select('id')
-    .eq('redemption_id', redemptionId)
-    .maybeSingle();
+    .insert({
+      redemption_id: redemptionId,
+      restaurant_id: restaurantId,
+      user_id: authData.user.id,
+      rating,
+      comment
+    });
 
-  if(existingError){
-    console.error('Review lookup error:', existingError);
-    toast(existingError.message || 'Could not check existing review', 'err');
+  if(error){
+    console.error('Review save error:', error);
+    toast(error.message || 'Could not save review', 'err');
     return;
   }
 
-  let saveError = null;
-
-  if(existingReview?.id){
-    const res = await supabaseClient
-      .from('restaurant_reviews')
-      .update({
-        restaurant_id: restaurantId,
-        user_id: authData.user.id,
-        rating,
-        comment
-      })
-      .eq('id', existingReview.id);
-
-    saveError = res.error;
-  } else {
-    const res = await supabaseClient
-      .from('restaurant_reviews')
-      .insert({
-        redemption_id: redemptionId,
-        restaurant_id: restaurantId,
-        user_id: authData.user.id,
-        rating,
-        comment
-      });
-
-    saveError = res.error;
-  }
-
-  if(saveError){
-    console.error('Review save error:', saveError);
-    toast(saveError.message || 'Could not save review', 'err');
-    return;
-  }
-
-  toast('Review saved! ⭐', 'ok');
+  toast('Thank you for your feedback! ⭐', 'ok');
   await loadCustomerRedemptions();
 }
 async function loadCustomerRedemptions(){
@@ -3792,40 +3780,54 @@ async function loadCustomerRedemptions(){
         </div>
 
         ${
-          r.status === 'redeemed'
-            ? `
-              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px">
-                <div style="font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:10px">Rate this restaurant</div>
+  r.status === 'redeemed'
+    ? existingReview
+      ? `
+        <div style="background:rgba(39,174,96,.10);border:1px solid rgba(39,174,96,.28);border-radius:12px;padding:14px">
+          <div style="font-size:.82rem;font-weight:600;color:var(--green);margin-bottom:6px">
+            Thanks for your feedback!
+          </div>
+          <div style="color:var(--gold);font-size:1rem;margin-bottom:6px">
+            ${'★'.repeat(existingRating)}${'☆'.repeat(5 - existingRating)}
+          </div>
+          <div style="font-size:.8rem;color:var(--text-muted)">
+            You already reviewed this offer. Your feedback helps other members choose better.
+          </div>
+        </div>
+      `
+      : `
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px">
+          <div style="font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:10px">Rate this restaurant</div>
 
-                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-                  ${[1,2,3,4,5].map(star => `
-                    <button
-                      type="button"
-                      class="heart-btn ${star <= existingRating ? 'saved' : ''}"
-                      data-redemption-rating="${r.id}"
-                      data-rating="${star}"
-                      onclick="setRedemptionRating(${r.id}, ${star})"
-                    >${star <= existingRating ? '★' : '☆'}</button>
-                  `).join('')}
-                </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            ${[1,2,3,4,5].map(star => `
+              <button
+                type="button"
+                class="heart-btn"
+                data-redemption-rating="${r.id}"
+                data-rating="${star}"
+                onclick="setRedemptionRating(${r.id}, ${star})"
+              >☆</button>
+            `).join('')}
+          </div>
 
-                <textarea
-                  id="review-comment-${r.id}"
-                  class="input-field"
-                  rows="2"
-                  placeholder="Optional comment"
-                  style="margin-bottom:10px"
-                >${existingReview?.comment || ''}</textarea>
+          <textarea
+            id="review-comment-${r.id}"
+            class="input-field"
+            rows="2"
+            placeholder="Optional comment"
+            style="margin-bottom:10px"
+          ></textarea>
 
-                <div style="display:flex;justify-content:flex-end">
-                  <button class="btn-gold" onclick="submitRedemptionReview(${r.id}, '${r.restaurant_id}')">
-                    Save Review
-                  </button>
-                </div>
-              </div>
-            `
-            : ''
-        }
+          <div style="display:flex;justify-content:flex-end">
+            <button class="btn-gold" onclick="submitRedemptionReview(${r.id}, '${r.restaurant_id}')">
+              Save Review
+            </button>
+          </div>
+        </div>
+      `
+    : ''
+}
       </div>
     `;
   }).join('');
@@ -4537,7 +4539,10 @@ function renderDeals(){
         </div>
         <div class="deal-body">
           <div class="deal-rest">${d.restaurant} <span class="dist">${d.district}</span></div>
-          <div class="deal-title">${d.title}</div>
+<div style="font-size:.78rem;color:var(--gold);margin-bottom:4px">
+  ${d.restaurant_review_count ? `${d.restaurant_rating.toFixed(1)} ⭐ (${d.restaurant_review_count})` : 'No ratings yet'}
+</div>
+<div class="deal-title">${d.title}</div>
           <div class="deal-desc">${d.desc.slice(0,80)}…</div>
           <div class="deal-foot">
             <div class="deal-prices"><span class="deal-orig">${d.orig}</span><span class="deal-new">${d.price}</span></div>
@@ -4589,7 +4594,10 @@ function liveCode(dealKey){
       </div>
       <div class="deal-body">
         <div class="deal-rest">${d.restaurant} <span class="dist">${d.district}</span></div>
-        <div class="deal-title">${d.title}</div>
+<div style="font-size:.78rem;color:var(--gold);margin-bottom:4px">
+  ${d.restaurant_review_count ? `${d.restaurant_rating.toFixed(1)} ⭐ (${d.restaurant_review_count})` : 'No ratings yet'}
+</div>
+<div class="deal-title">${d.title}</div>
         <div class="deal-desc">${d.desc.slice(0,80)}…</div>
         <div class="deal-foot">
           <div class="deal-prices">
@@ -4644,7 +4652,32 @@ function liveCode(dealKey){
   const validOffers = offers.filter(o => restaurantMap[o.restaurant_id]);
 
   const offerIds = validOffers.map(o => o.id);
+let ratingMap = {};
+if(restaurantIds.length){
+  const { data: reviews, error: reviewsError } = await supabaseClient
+    .from('restaurant_reviews')
+    .select('restaurant_id, rating')
+    .in('restaurant_id', restaurantIds);
 
+  if(reviewsError){
+    console.error('Error loading restaurant ratings:', reviewsError);
+  } else {
+    const grouped = {};
+    (reviews || []).forEach(r => {
+      if(!grouped[r.restaurant_id]) grouped[r.restaurant_id] = [];
+      grouped[r.restaurant_id].push(Number(r.rating || 0));
+    });
+
+    Object.keys(grouped).forEach(id => {
+      const vals = grouped[id].filter(v => !Number.isNaN(v));
+      const avg = vals.length ? vals.reduce((a,b) => a + b, 0) / vals.length : 0;
+      ratingMap[id] = {
+        avg,
+        count: vals.length
+      };
+    });
+  }
+}
   let termsMap = {};
   if(offerIds.length){
     const { data: terms, error: termsError } = await supabaseClient
@@ -4683,7 +4716,9 @@ function liveCode(dealKey){
       restaurant_tags: Array.isArray(restaurant.tags) ? restaurant.tags : [],
       restaurant_cover_image: restaurant.cover_image_url || '',
       restaurant_logo_image: restaurant.logo_image_url || '',
-      cat: o.category || 'deal',
+restaurant_rating: ratingMap[o.restaurant_id]?.avg || 0,
+restaurant_review_count: ratingMap[o.restaurant_id]?.count || 0,
+cat: o.category || 'deal',
       time: o.start_time ? 'lunch' : 'dinner',
       img: o.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&q=75',
       disc: o.discount_value || o.discount_type || 'Deal',
