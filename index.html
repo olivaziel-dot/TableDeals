@@ -4655,9 +4655,9 @@ function liveCode(dealKey){
 let ratingMap = {};
 if(restaurantIds.length){
   const { data: reviews, error: reviewsError } = await supabaseClient
-    .from('restaurant_reviews')
-    .select('restaurant_id, rating')
-    .in('restaurant_id', restaurantIds);
+  .from('restaurant_reviews')
+  .select('restaurant_id,rating')
+  .in('restaurant_id', restaurantIds);
 
   if(reviewsError){
     console.error('Error loading restaurant ratings:', reviewsError);
