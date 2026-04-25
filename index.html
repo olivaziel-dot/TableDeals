@@ -4840,10 +4840,22 @@ if(_modalDeal.restaurant_website) details.push(`<li>Website: ${_modalDeal.restau
 if(_modalDeal.restaurant_instagram) details.push(`<li>Instagram: ${_modalDeal.restaurant_instagram}</li>`);
 if(_modalDeal.restaurant_avg_price) details.push(`<li>Avg. Price Level: ${priceTierLabel(_modalDeal.restaurant_avg_price)}</li>`);
 
-const { data: reviewRows } = await supabaseClient
-  .from('restaurant_reviews')
-  .select('rating')
-  .eq('restaurant_id', _modalDeal.restaurant_id);
+let reviewRows = [];
+
+const cleanModalRestaurantId = String(_modalDeal.restaurant_id || '').trim();
+
+if(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanModalRestaurantId)){
+  const { data, error } = await supabaseClient
+    .from('restaurant_reviews')
+    .select('rating')
+    .eq('restaurant_id', cleanModalRestaurantId);
+
+  if(error){
+    console.error('Error loading restaurant profile rating:', error);
+  } else {
+    reviewRows = data || [];
+  }
+}
 
 if(reviewRows && reviewRows.length){
   const avg = reviewRows.reduce((sum, row) => sum + Number(row.rating || 0), 0) / reviewRows.length;
