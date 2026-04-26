@@ -1445,24 +1445,19 @@ footer{padding:72px 44px 36px;border-top:1px solid var(--border)}
         </div>
       </div>
       <!-- VERIFY COUPON -->
-      <div class="pane" id="pane-r-verify">
-        <div class="rdash-header"><h1>Verify Coupon</h1><p>Enter the customer's code to confirm it's valid in real time.</p></div>
-        <div class="panel" style="max-width:560px">
-          <div class="panel-head">Coupon Verification</div>
-          <p style="font-size:.86rem;color:var(--text-soft);margin-bottom:16px;line-height:1.65">Ask the customer to show their TableDeal app. Enter the code displayed on their screen — it changes every 5 minutes so screenshots won't work.</p>
-          <div class="verify-section">
-            <div style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:5px">Enter Customer Code</div>
-            <div class="verify-input-row">
-              <input class="input-field" id="verify-input" placeholder="e.g. TD-BURG-A3F8K2" style="font-family:monospace;font-size:1rem;letter-spacing:.05em"/>
-              <button class="btn-gold" onclick="verifyCode()">Verify</button>
-            </div>
-            <div class="verify-result" id="verify-result"></div>
-          </div>
-          <div style="background:var(--surface2);border-radius:var(--r);padding:14px;font-size:.82rem;color:var(--text-muted);line-height:1.6;border:1px solid var(--border)">
-            <strong style="color:var(--text-soft)">How it works:</strong> Each code encodes the deal, customer ID, and a 5-minute time window. If the code was valid 6 minutes ago, it's already expired. Once redeemed, it's marked as used and cannot be reused.
-          </div>
-        </div>
-      </div>
+<div class="pane" id="pane-r-verify">
+  <div class="rdash-header">
+    <h1>Verify Coupon</h1>
+    <p>Confirm pending customer redemption requests.</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">Pending Redemptions</div>
+    <div id="pending-redemption-requests" style="display:flex;flex-direction:column;gap:12px">
+      <div style="color:var(--text-muted)">Loading...</div>
+    </div>
+  </div>
+</div>
       <!-- RESERVATIONS -->
       <!-- RESERVATIONS -->
       <div class="pane" id="pane-r-reservations">
@@ -3528,13 +3523,14 @@ async function initRestaurant(){
 
   console.log('Restaurant init start for:', restaurant);
 
-  await loadCurrentRestaurant();
+await loadCurrentRestaurant();
 await loadRestaurantProfile();
 await loadRestaurantHours();
 await loadRestaurantOffers();
 await loadRestaurantReservations();
 await loadRestaurantRedemptions();
 await loadRestaurantOverviewStats();
+await loadPendingRedemptionRequests();
 
   const defaultPane = document.getElementById('pane-r-overview');
   if(defaultPane){
@@ -5455,82 +5451,155 @@ async function requestRedemption(){
   toast('Request sent to restaurant ✅', 'ok');
 }
 /* ─── RESTAURANT CODE VERIFIER ─── */
-async function verifyCode(){
-  const val = (document.getElementById('verify-input')?.value || '').trim().toUpperCase();
-  const res = document.getElementById('verify-result');
-
-  if(!res){
-    console.error('verify-result element not found');
-    return;
-  }
-
-  if(!val){
-    res.className = 'verify-result invalid';
-    res.textContent = '❌ Please enter a code.';
-    return;
-  }
-
+/* ─── RESTAURANT REDEMPTION REQUESTS ─── */
+async function loadPendingRedemptionRequests(){
   const restaurantId = await getCurrentRestaurantId();
+  const list = document.getElementById('pending-redemption-requests');
+
+  if(!list) return;
+
   if(!restaurantId){
-    res.className = 'verify-result invalid';
-    res.textContent = '❌ Restaurant not found.';
+    list.innerHTML = `<div style="color:var(--red)">Restaurant not found.</div>`;
     return;
   }
 
-  const { data, error } = await supabaseClient
-    .from('redemptions')
+  const { data: requests, error } = await supabaseClient
+    .from('redemption_requests')
     .select('*')
-    .eq('code', val)
     .eq('restaurant_id', restaurantId)
+    .eq('status', 'pending')
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false });
+
+  if(error){
+    console.error('Pending redemption requests error:', error);
+    list.innerHTML = `<div style="color:var(--red)">Could not load requests.</div>`;
+    return;
+  }
+
+  if(!requests || !requests.length){
+    list.innerHTML = `<div style="color:var(--text-muted)">No pending redemption requests.</div>`;
+    return;
+  }
+
+  const offerIds = [...new Set(requests.map(r => r.offer_id).filter(Boolean))];
+  const userIds = [...new Set(requests.map(r => r.user_id).filter(Boolean))];
+
+  const { data: offers } = await supabaseClient
+    .from('offers')
+    .select('id,title')
+    .in('id', offerIds);
+
+  const { data: users } = await supabaseClient
+    .from('profiles')
+    .select('id,name,email')
+    .in('id', userIds);
+
+  const offerMap = {};
+  (offers || []).forEach(o => offerMap[o.id] = o);
+
+  const userMap = {};
+  (users || []).forEach(u => userMap[u.id] = u);
+
+  list.innerHTML = requests.map(r => {
+    const offer = offerMap[r.offer_id] || {};
+    const user = userMap[r.user_id] || {};
+    const expires = new Date(r.expires_at).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+
+    return `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r2);padding:16px;display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap">
+        <div>
+          <div style="font-size:.95rem;font-weight:700;color:var(--text)">${offer.title || 'Offer'}</div>
+          <div style="font-size:.8rem;color:var(--text-muted);margin-top:4px">Customer: ${user.name || user.email || 'Customer'}</div>
+          <div style="font-family:monospace;font-size:1.4rem;color:var(--gold);font-weight:700;margin-top:8px">${r.code}</div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:3px">Expires at ${expires}</div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button class="btn-gold" onclick="confirmRedemptionRequest('${r.id}')">Confirm</button>
+          <button class="btn-danger" onclick="rejectRedemptionRequest('${r.id}')">Reject</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function confirmRedemptionRequest(requestId){
+  const restaurantId = await getCurrentRestaurantId();
+
+  const { data: req, error: getError } = await supabaseClient
+    .from('redemption_requests')
+    .select('*')
+    .eq('id', requestId)
+    .eq('restaurant_id', restaurantId)
+    .eq('status', 'pending')
     .single();
 
-  if(error || !data){
-    console.error('Verify lookup error:', error);
-    res.className = 'verify-result invalid';
-    res.textContent = '❌ Code not found for this restaurant.';
+  if(getError || !req){
+    console.error('Request lookup error:', getError);
+    toast('Request not found or already handled', 'err');
+    await loadPendingRedemptionRequests();
     return;
   }
 
-  if(data.status === 'redeemed'){
-    res.className = 'verify-result invalid';
-    res.textContent = '❌ This code has already been redeemed.';
+  if(new Date(req.expires_at) < new Date()){
+    toast('Request expired', 'err');
+
+    await supabaseClient
+      .from('redemption_requests')
+      .update({ status: 'expired' })
+      .eq('id', requestId);
+
+    await loadPendingRedemptionRequests();
     return;
   }
 
-  if(data.status !== 'issued'){
-    res.className = 'verify-result invalid';
-    res.textContent = '❌ This code is not valid anymore.';
-    return;
-  }
-
-  if(data.expires_at && new Date(data.expires_at) < new Date()){
-    res.className = 'verify-result invalid';
-    res.textContent = '❌ Code expired.';
-    return;
-  }
-
-  const { error: updateError } = await supabaseClient
+  const { error: insertError } = await supabaseClient
     .from('redemptions')
-    .update({
+    .insert([{
+      offer_id: req.offer_id,
+      customer_id: req.user_id,
+      restaurant_id: req.restaurant_id,
+      code: req.code,
       status: 'redeemed',
-      redeemed_at: new Date().toISOString()
-    })
-    .eq('id', data.id)
-    .eq('restaurant_id', restaurantId)
-    .eq('status', 'issued');
+      redeemed_at: new Date().toISOString(),
+      expires_at: req.expires_at
+    }]);
 
-  if(updateError){
-    console.error('Verify update error:', updateError);
-    res.className = 'verify-result invalid';
-    res.textContent = '❌ Could not redeem code.';
+  if(insertError){
+    console.error('Redemption insert error:', insertError);
+    toast(insertError.message || 'Could not confirm redemption', 'err');
     return;
   }
 
-  res.className = 'verify-result valid';
-  res.innerHTML = `✅ <strong>Valid!</strong> Code accepted and marked as redeemed.`;
+  await supabaseClient
+    .from('redemption_requests')
+    .update({
+      status: 'confirmed',
+      confirmed_at: new Date().toISOString()
+    })
+    .eq('id', requestId);
 
+  toast('Redemption confirmed ✅', 'ok');
+  await loadPendingRedemptionRequests();
   await loadRestaurantRedemptions();
   await loadRestaurantOffers();
+}
+
+async function rejectRedemptionRequest(requestId){
+  const { error } = await supabaseClient
+    .from('redemption_requests')
+    .update({ status: 'rejected' })
+    .eq('id', requestId);
+
+  if(error){
+    console.error('Reject request error:', error);
+    toast('Could not reject request', 'err');
+    return;
+  }
+
+  toast('Request rejected', 'ok');
+  await loadPendingRedemptionRequests();
 }
 async function initManager(){
   await loadManagerStats();
